@@ -1,0 +1,30 @@
+{
+    "name": "snowmannunu/weather",
+    "description": "A weather SDK.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Snowman",
+            "email": "345750542@qq.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "SnowmanNunu\\Weather\\": "src"
+        }
+    },
+    "require": {
+        "guzzlehttp/guzzle": "^7.7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "mockery/mockery": "^1.5"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SnowmanNunu\\Weather\\ServiceProvider"
+            ]
+        }
+    }
+}
