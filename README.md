@@ -1,6 +1,6 @@
-<h1 align="center"> 基于高德开放平台的PHP天气信息组件 </h1>
+<h1 align="center">基于高德开放平台的PHP天气信息组件 </h1>
 
-<p align="center"> A weather SDK.</p>
+<p align="center">A weather SDK</p>
 
 
 ## Installing
@@ -9,19 +9,43 @@
 $ composer require snowmannunu/weather -vvv
 ```
 
+## Config
+
+在使用本扩展之前，你需要去 [高德开放平台](https://lbs.amap.com/ "高德开放平台") 注册账号，然后创建应用，获取应用的 API Key。
+
+
 ## Usage
 
 ```php
-use SnomanNunu\Weather\Weather;
+use SnowmanNunu\Weather\Weather;
 
-$key = 'xxxxxxxxxxxxxxxxxxxxxxxxxxx';
+$key = 'your key';
 
 $weather = new Weather($key);
 
-$response = $weather->getWeather('深圳');
+```
+### 获取实时天气
+```php
+$response = $weather->getLiveWeather('深圳');
+```
 
-$response = $weather->getWeather('深圳', 'all');
+### 获取近期天气预报
+```php
+$response = $weather->getForecastsWeather('深圳');
 
+```
+
+## Used in Laravel
+
+在 Laravel 中使用也是同样的安装方式，配置写在 config/services.php 中：
+```php
+'weather' => [
+   'key' => env('WEATHER_API_KEY'),
+],
+```
+在 .env 中配置 WEATHER_API_KEY ：
+```php
+WEATHER_API_KEY=your key
 ```
 
 TODO
