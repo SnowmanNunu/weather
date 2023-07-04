@@ -6,7 +6,6 @@ use GuzzleHttp\Client;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
-
 class Weather
 {
     protected $key;
@@ -15,18 +14,18 @@ class Weather
     public function __construct(string $key)
     {
         $this->key = $key;
-    }   
-    
+    }
+
     public function getHttpClient()
     {
         return new Client($this->guzzleOptions);
     }
-    
+
     public function setGuzzleOptions(array $options)
     {
         $this->guzzleOptions = $options;
     }
-    
+
     public function getLiveWeather($city, $format = 'json')
     {
         return $this->getWeather($city, 'base', $format);
@@ -36,7 +35,7 @@ class Weather
     {
         return $this->getWeather($city, 'all', $format);
     }
-    
+
     public function getWeather($city, $type = 'base', $format = 'json')
     {
         $url = 'https://restapi.amap.com/v3/weather/weatherInfo';
