@@ -1,7 +1,7 @@
 <h1 align="center">基于高德开放平台的PHP天气信息组件 </h1>
 
 [![Tests](https://github.com/SnowmanNunu/weather/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowmanNunu/weather/actions/workflows/tests.yml)
-
+![StyleCI](https://github.styleci.io/repos/661587647/shield)
 <p align="center">A weather SDK</p>
 
 
