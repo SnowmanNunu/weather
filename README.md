@@ -2,6 +2,9 @@
 
 [![Tests](https://github.com/SnowmanNunu/weather/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowmanNunu/weather/actions/workflows/tests.yml)
 ![StyleCI](https://github.styleci.io/repos/661587647/shield)
+[![Latest Stable Version](http://poser.pugx.org/snowmannunu/weather/v)](https://packagist.org/packages/snowmannunu/weather) 
+[![Total Downloads](http://poser.pugx.org/snowmannunu/weather/downloads)](https://packagist.org/packages/snowmannunu/weather) 
+[![License](http://poser.pugx.org/snowmannunu/weather/license)](https://packagist.org/packages/snowmannunu/weather)
 <p align="center">A weather SDK</p>
 
 
