@@ -7,7 +7,8 @@ namespace SnowmanNunu\Weather\Tests;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Psr7\Response;
-use Mockery\Matcher\AnyArgs;
+use SnowmanNunu\Weather\DTO\CurrentWeather;
+use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 use SnowmanNunu\Weather\Providers\AMapProvider;
@@ -15,65 +16,103 @@ use PHPUnit\Framework\TestCase;
 
 class AMapProviderTest extends TestCase
 {
-    public function testGetWeather()
+    protected function mockClient(array $responseData): Client
     {
-        // json
-        $response = new Response(200, [], '{"success": true}');
+        $response = new Response(200, [], json_encode($responseData));
         $client = \Mockery::mock(Client::class);
-        $client->allows()->get('https://restapi.amap.com/v3/weather/weatherInfo', [
-            'query' => [
-                'key' => 'mock-key',
-                'city' => '深圳',
-                'output' => 'json',
-                'extensions' => 'base',
+        $client->allows()->get(\Mockery::any(), \Mockery::any())->andReturn($response);
+
+        return $client;
+    }
+
+    public function testGetLiveWeather()
+    {
+        $client = $this->mockClient([
+            'status' => '1',
+            'lives' => [
+                [
+                    'city' => '深圳市',
+                    'adcode' => '440300',
+                    'weather' => '晴',
+                    'temperature' => '26',
+                    'winddirection' => '东',
+                    'windpower' => '≤3',
+                    'humidity' => '65',
+                    'reporttime' => '2024-01-01 14:30:00',
+                ],
             ],
-        ])->andReturn($response);
+        ]);
 
-        $w = new AMapProvider('mock-key');
-        $w->setHttpClient($client);
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
 
-        $this->assertSame(['success' => true], $w->getWeather('深圳'));
+        $weather = $provider->getLiveWeather('深圳');
 
-        // xml
-        $response = new Response(200, [], '<hello>content</hello>');
-        $client = \Mockery::mock(Client::class);
-        $client->allows()->get('https://restapi.amap.com/v3/weather/weatherInfo', [
-            'query' => [
-                'key' => 'mock-key',
-                'city' => '深圳',
-                'extensions' => 'all',
-                'output' => 'xml',
+        $this->assertInstanceOf(CurrentWeather::class, $weather);
+        $this->assertSame('深圳市', $weather->city);
+        $this->assertSame(26.0, $weather->temperature);
+        $this->assertSame('晴', $weather->weather);
+        $this->assertSame('东', $weather->windDirection);
+    }
+
+    public function testGetForecastsWeather()
+    {
+        $client = $this->mockClient([
+            'status' => '1',
+            'forecasts' => [
+                [
+                    'city' => '深圳市',
+                    'adcode' => '440300',
+                    'casts' => [
+                        [
+                            'date' => '2024-01-01',
+                            'week' => '1',
+                            'dayweather' => '晴',
+                            'nightweather' => '多云',
+                            'daytemp' => '28',
+                            'nighttemp' => '18',
+                            'daywind' => '东',
+                            'nightwind' => '西',
+                            'daypower' => '≤3',
+                            'nightpower' => '≤3',
+                        ],
+                    ],
+                ],
             ],
-        ])->andReturn($response);
+        ]);
 
-        $w = new AMapProvider('mock-key');
-        $w->setHttpClient($client);
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
 
-        $this->assertSame('<hello>content</hello>', $w->getWeather('深圳', 'all', 'xml'));
+        $forecast = $provider->getForecastsWeather('深圳');
+
+        $this->assertInstanceOf(Forecast::class, $forecast);
+        $this->assertSame('深圳市', $forecast->city);
+        $this->assertCount(1, $forecast->casts);
+        $this->assertSame('周一', $forecast->casts[0]->week);
+        $this->assertSame(28.0, $forecast->casts[0]->dayTemp);
     }
 
     public function testGetHttpClient()
     {
-        $w = new AMapProvider('mock-key');
-        $this->assertInstanceOf(ClientInterface::class, $w->getHttpClient());
+        $provider = new AMapProvider('mock-key');
+        $this->assertInstanceOf(ClientInterface::class, $provider->getHttpClient());
     }
 
     public function testGetWeatherWithEmptyCity()
     {
-        $w = new AMapProvider('mock-key');
+        $provider = new AMapProvider('mock-key');
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('City name cannot be empty.');
-
-        $w->getWeather('');
+        $provider->getLiveWeather('');
     }
 
     public function testGetHttpClientReturnsSameInstance()
     {
-        $w = new AMapProvider('mock-key');
+        $provider = new AMapProvider('mock-key');
 
-        $client1 = $w->getHttpClient();
-        $client2 = $w->getHttpClient();
+        $client1 = $provider->getHttpClient();
+        $client2 = $provider->getHttpClient();
 
         $this->assertSame($client1, $client2);
         $this->assertInstanceOf(ClientInterface::class, $client1);
@@ -81,79 +120,50 @@ class AMapProviderTest extends TestCase
 
     public function testSetHttpClient()
     {
-        $w = new AMapProvider('mock-key');
+        $provider = new AMapProvider('mock-key');
         $customClient = new Client(['timeout' => 10]);
 
-        $w->setHttpClient($customClient);
+        $provider->setHttpClient($customClient);
 
-        $this->assertSame($customClient, $w->getHttpClient());
+        $this->assertSame($customClient, $provider->getHttpClient());
     }
 
     public function testSetGuzzleOptions()
     {
-        $w = new AMapProvider('mock-key');
+        $provider = new AMapProvider('mock-key');
 
-        $this->assertNull($w->getHttpClient()->getConfig('timeout'));
+        $this->assertNull($provider->getHttpClient()->getConfig('timeout'));
 
-        $w->setGuzzleOptions(['timeout' => 5000]);
+        $provider->setGuzzleOptions(['timeout' => 5000]);
 
-        $this->assertSame(5000, $w->getHttpClient()->getConfig('timeout'));
+        $this->assertSame(5000, $provider->getHttpClient()->getConfig('timeout'));
     }
 
-    public function testGetWeatherWithInvalidType()
+    public function testApiErrorThrowsHttpException()
     {
-        $w = new AMapProvider('mock-key');
+        $client = $this->mockClient(['status' => '0', 'info' => 'INVALID_PARAMS']);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid type value(base/all): foo');
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
 
-        $w->getWeather('深圳', 'foo');
-
-        $this->fail('Failed to assert getWeather throw exception with invalid argument.');
-    }
-
-    public function testGetWeatherWithInvalidFormat()
-    {
-        $w = new AMapProvider('mock-key');
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid response format: array');
-
-        $w->getWeather('深圳', 'base', 'array');
-
-        $this->fail('Failed to assert getWeather throw exception with invalid argument.');
+        $this->expectException(HttpException::class);
+        $provider->getLiveWeather('深圳');
     }
 
     public function testGetWeatherWithGuzzleRuntimeException()
     {
-        $client = \Mockery::mock(Client::class);
         $request = new \GuzzleHttp\Psr7\Request('GET', 'test');
+        $client = \Mockery::mock(Client::class);
         $client->allows()
-            ->get(new AnyArgs())
+            ->get(\Mockery::any(), \Mockery::any())
             ->andThrow(new \GuzzleHttp\Exception\ConnectException('request timeout', $request));
 
-        $w = new AMapProvider('mock-key');
-        $w->setHttpClient($client);
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
 
         $this->expectException(HttpException::class);
         $this->expectExceptionMessage('request timeout');
 
-        $w->getWeather('深圳');
-    }
-
-    public function testGetLiveWeather()
-    {
-        $w = \Mockery::mock(AMapProvider::class, ['mock-key'])->makePartial();
-        $w->expects()->getWeather('深圳', 'base', 'json')->andReturn(['success' => true]);
-
-        $this->assertSame(['success' => true], $w->getLiveWeather('深圳'));
-    }
-
-    public function testGetForecastsWeather()
-    {
-        $w = \Mockery::mock(AMapProvider::class, ['mock-key'])->makePartial();
-        $w->expects()->getWeather('深圳', 'all', 'json')->andReturn(['success' => true]);
-
-        $this->assertSame(['success' => true], $w->getForecastsWeather('深圳'));
+        $provider->getLiveWeather('深圳');
     }
 }

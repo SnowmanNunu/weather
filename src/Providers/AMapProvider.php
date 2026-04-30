@@ -7,13 +7,19 @@ namespace SnowmanNunu\Weather\Providers;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\CurrentWeather;
+use SnowmanNunu\Weather\DTO\Forecast;
+use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
 class AMapProvider implements Provider
 {
     protected string $key;
+
+    /** @var array<string, mixed> */
     protected array $guzzleOptions = [];
+
     protected ?Client $httpClient = null;
 
     public function __construct(string $key)
@@ -35,6 +41,9 @@ class AMapProvider implements Provider
         $this->httpClient = $client;
     }
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function setGuzzleOptions(array $options): void
     {
         $this->guzzleOptions = $options;
@@ -46,17 +55,67 @@ class AMapProvider implements Provider
         return 'amap';
     }
 
-    public function getLiveWeather(string $city, string $format = 'json')
+    public function getLiveWeather(string $city): CurrentWeather
     {
-        return $this->getWeather($city, 'base', $format);
+        $data = $this->request($city, 'base');
+
+        if (($data['status'] ?? '0') !== '1' || empty($data['lives'][0])) {
+            throw new HttpException('AMap API returned invalid status or empty data.');
+        }
+
+        $live = $data['lives'][0];
+
+        return new CurrentWeather(
+            city: $live['city'] ?? $city,
+            adcode: $live['adcode'] ?? '',
+            temperature: (float) ($live['temperature'] ?? 0),
+            weather: $live['weather'] ?? '',
+            windDirection: $live['winddirection'] ?? '',
+            windPower: $live['windpower'] ?? '',
+            humidity: isset($live['humidity']) ? (int) $live['humidity'] : null,
+            updateTime: $live['reporttime'] ?? '',
+        );
     }
 
-    public function getForecastsWeather(string $city, string $format = 'json')
+    public function getForecastsWeather(string $city): Forecast
     {
-        return $this->getWeather($city, 'all', $format);
+        $data = $this->request($city, 'all');
+
+        if (($data['status'] ?? '0') !== '1' || empty($data['forecasts'][0])) {
+            throw new HttpException('AMap API returned invalid status or empty forecast data.');
+        }
+
+        $forecast = $data['forecasts'][0];
+        $casts = [];
+
+        foreach ($forecast['casts'] ?? [] as $cast) {
+            $casts[] = new ForecastDay(
+                date: $cast['date'] ?? '',
+                week: $this->mapWeek($cast['week'] ?? ''),
+                dayWeather: $cast['dayweather'] ?? '',
+                nightWeather: $cast['nightweather'] ?? '',
+                dayTemp: (float) ($cast['daytemp'] ?? 0),
+                nightTemp: (float) ($cast['nighttemp'] ?? 0),
+                dayWind: $cast['daywind'] ?? '',
+                nightWind: $cast['nightwind'] ?? '',
+                dayPower: $cast['daypower'] ?? '',
+                nightPower: $cast['nightpower'] ?? '',
+            );
+        }
+
+        return new Forecast(
+            city: $forecast['city'] ?? $city,
+            adcode: $forecast['adcode'] ?? '',
+            casts: $casts,
+        );
     }
 
-    public function getWeather(string $city, string $type = 'base', string $format = 'json')
+    /**
+     * @return array<string, mixed>
+     * @throws HttpException
+     * @throws InvalidArgumentException
+     */
+    protected function request(string $city, string $type): array
     {
         $url = 'https://restapi.amap.com/v3/weather/weatherInfo';
 
@@ -64,12 +123,7 @@ class AMapProvider implements Provider
             throw new InvalidArgumentException('City name cannot be empty.');
         }
 
-        $format = strtolower($format);
         $type = strtolower($type);
-
-        if (!in_array($format, ['xml', 'json'], true)) {
-            throw new InvalidArgumentException('Invalid response format: ' . $format);
-        }
 
         if (!in_array($type, ['base', 'all'], true)) {
             throw new InvalidArgumentException('Invalid type value(base/all): ' . $type);
@@ -78,7 +132,6 @@ class AMapProvider implements Provider
         $query = array_filter([
             'key' => $this->key,
             'city' => $city,
-            'output' => $format,
             'extensions' => $type,
         ]);
 
@@ -87,9 +140,26 @@ class AMapProvider implements Provider
                 'query' => $query,
             ])->getBody()->getContents();
 
-            return 'json' === $format ? json_decode($response, true) : $response;
+            $decoded = json_decode($response, true);
+
+            return is_array($decoded) ? $decoded : [];
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    protected function mapWeek(string $week): string
+    {
+        $map = [
+            '1' => '周一',
+            '2' => '周二',
+            '3' => '周三',
+            '4' => '周四',
+            '5' => '周五',
+            '6' => '周六',
+            '7' => '周日',
+        ];
+
+        return $map[$week] ?? $week;
     }
 }

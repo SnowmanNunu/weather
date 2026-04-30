@@ -13,7 +13,7 @@ $key = getenv('WEATHER_KEY') ?: '';
 
 $weather = null;
 $error = null;
-$live = null;
+$current = null;
 $forecast = null;
 $city = $_GET['city'] ?? '';
 
@@ -27,9 +27,9 @@ if (!empty($key)) {
     $error = '请在服务器环境变量中配置 WEATHER_KEY';
 }
 
-if ($weather && !empty($city)) {
+if ($weather !== null && !empty($city)) {
     try {
-        $live = $weather->getLiveWeather($city);
+        $current = $weather->getLiveWeather($city);
         $forecast = $weather->getForecastsWeather($city);
     } catch (\Throwable $e) {
         $error = $e->getMessage();
@@ -68,50 +68,47 @@ $defaultCity = $city ?: '北京';
             <div class="alert alert-error"><?php echo htmlspecialchars((string)$error, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
 
-        <?php if ($live && isset($live['lives'][0])): ?>
-            <?php $l = $live['lives'][0]; ?>
+        <?php if ($current !== null): ?>
             <div class="card current">
                 <div class="current-main">
-                    <div class="city-name"><?php echo htmlspecialchars((string)($l['city'] ?? $city), ENT_QUOTES, 'UTF-8'); ?></div>
-                    <div class="temperature"><?php echo htmlspecialchars((string)($l['temperature'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?>°</div>
-                    <div class="weather-desc"><?php echo htmlspecialchars((string)($l['weather'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="city-name"><?php echo htmlspecialchars($current->city, ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="temperature"><?php echo htmlspecialchars((string)$current->temperature, ENT_QUOTES, 'UTF-8'); ?>°</div>
+                    <div class="weather-desc"><?php echo htmlspecialchars($current->weather, ENT_QUOTES, 'UTF-8'); ?></div>
                 </div>
                 <div class="current-meta">
                     <div class="meta-item">
                         <span class="meta-label">湿度</span>
-                        <span class="meta-value"><?php echo htmlspecialchars((string)($l['humidity'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?>%</span>
+                        <span class="meta-value"><?php echo $current->humidity !== null ? htmlspecialchars((string)$current->humidity, ENT_QUOTES, 'UTF-8') . '%' : '-'; ?></span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">风向</span>
-                        <span class="meta-value"><?php echo htmlspecialchars((string)($l['winddirection'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="meta-value"><?php echo htmlspecialchars($current->windDirection, ENT_QUOTES, 'UTF-8'); ?></span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">风力</span>
-                        <span class="meta-value"><?php echo htmlspecialchars((string)($l['windpower'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="meta-value"><?php echo htmlspecialchars($current->windPower, ENT_QUOTES, 'UTF-8'); ?></span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">更新时间</span>
-                        <span class="meta-value"><?php echo htmlspecialchars((string)($l['reporttime'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="meta-value"><?php echo htmlspecialchars($current->updateTime, ENT_QUOTES, 'UTF-8'); ?></span>
                     </div>
                 </div>
             </div>
-        <?php elseif ($live && isset($live['code']) && $live['code'] !== '200' && $live['code'] !== '1'): ?>
-            <div class="alert alert-warning">未找到该城市的天气数据，请检查城市名称。</div>
         <?php endif; ?>
 
-        <?php if ($forecast && isset($forecast['forecasts'][0]['casts'])): ?>
+        <?php if ($forecast !== null && !empty($forecast->casts)): ?>
             <h2 class="section-title">未来预报</h2>
             <div class="forecast-grid">
-                <?php foreach ($forecast['forecasts'][0]['casts'] as $cast): ?>
+                <?php foreach ($forecast->casts as $cast): ?>
                     <div class="card forecast">
-                        <div class="forecast-date"><?php echo htmlspecialchars((string)($cast['date'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                        <div class="forecast-day"><?php echo htmlspecialchars((string)($cast['week'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                        <div class="forecast-weather">☀ <?php echo htmlspecialchars((string)($cast['dayweather'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="forecast-date"><?php echo htmlspecialchars($cast->date, ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="forecast-day"><?php echo htmlspecialchars($cast->week, ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="forecast-weather">☀ <?php echo htmlspecialchars($cast->dayWeather, ENT_QUOTES, 'UTF-8'); ?></div>
                         <div class="forecast-temp">
-                            <?php echo htmlspecialchars((string)($cast['daytemp'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?>° /
-                            <?php echo htmlspecialchars((string)($cast['nighttemp'] ?? '-'), ENT_QUOTES, 'UTF-8'); ?>°
+                            <?php echo htmlspecialchars((string)$cast->dayTemp, ENT_QUOTES, 'UTF-8'); ?>° /
+                            <?php echo htmlspecialchars((string)$cast->nightTemp, ENT_QUOTES, 'UTF-8'); ?>°
                         </div>
-                        <div class="forecast-wind"><?php echo htmlspecialchars((string)($cast['daywind'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>风 <?php echo htmlspecialchars((string)($cast['daypower'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="forecast-wind"><?php echo htmlspecialchars($cast->dayWind, ENT_QUOTES, 'UTF-8'); ?>风 <?php echo htmlspecialchars($cast->dayPower, ENT_QUOTES, 'UTF-8'); ?></div>
                     </div>
                 <?php endforeach; ?>
             </div>

@@ -6,6 +6,9 @@ namespace SnowmanNunu\Weather\Tests;
 
 use GuzzleHttp\Client;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\CurrentWeather;
+use SnowmanNunu\Weather\DTO\Forecast;
+use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 use SnowmanNunu\Weather\Providers\AMapProvider;
 use SnowmanNunu\Weather\Providers\QWeatherProvider;
@@ -50,65 +53,79 @@ class WeatherTest extends TestCase
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
-        $provider->expects()->getWeather('深圳', 'base', 'json')->andReturn(['status' => '1']);
+        $provider->expects()->getLiveWeather('深圳')->andReturn(
+            new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3')
+        );
 
         $w = new Weather($provider);
-        $result = $w->getWeather('深圳');
+        $result = $w->getLiveWeather('深圳');
 
-        $this->assertSame(['status' => '1'], $result);
+        $this->assertInstanceOf(CurrentWeather::class, $result);
+        $this->assertSame('深圳市', $result->city);
     }
 
     public function testCacheHit()
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
-        $provider->shouldNotReceive('getWeather');
+        $provider->shouldNotReceive('getLiveWeather');
+
+        $cachedWeather = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':base:json';
-        $cache->allows()->get($cacheKey)->andReturn(['cached' => true]);
+        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
+        $cache->allows()->get($cacheKey)->andReturn($cachedWeather);
 
         $w = new Weather($provider);
         $w->withCache($cache);
 
-        $this->assertSame(['cached' => true], $w->getWeather('深圳'));
+        $result = $w->getLiveWeather('深圳');
+        $this->assertSame($cachedWeather, $result);
     }
 
     public function testCacheMissAndStore()
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
-        $provider->expects()->getWeather('深圳', 'base', 'json')->once()->andReturn(['live' => true]);
+        $weather = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
+        $provider->expects()->getLiveWeather('深圳')->once()->andReturn($weather);
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':base:json';
+        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
         $cache->allows()->get($cacheKey)->andReturn(null);
-        $cache->expects()->set($cacheKey, ['live' => true], 300)->once();
+        $cache->expects()->set($cacheKey, $weather, 300)->once();
 
         $w = new Weather($provider);
         $w->withCache($cache);
 
-        $this->assertSame(['live' => true], $w->getWeather('深圳'));
-    }
-
-    public function testGetLiveWeatherDelegates()
-    {
-        $provider = \Mockery::mock(Provider::class);
-        $provider->allows()->getName()->andReturn('mock');
-        $provider->expects()->getWeather('北京', 'base', 'json')->andReturn(['temp' => '25']);
-
-        $w = new Weather($provider);
-        $this->assertSame(['temp' => '25'], $w->getLiveWeather('北京'));
+        $this->assertSame($weather, $w->getLiveWeather('深圳'));
     }
 
     public function testGetForecastsWeatherDelegates()
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
-        $provider->expects()->getWeather('北京', 'all', 'json')->andReturn(['forecasts' => []]);
+        $forecast = new Forecast('北京市', '110000', [
+            new ForecastDay('2024-01-01', '周一', '晴', '多云', 10.0, 0.0, '北', '南', '≤3', '≤3'),
+        ]);
+        $provider->expects()->getForecastsWeather('北京')->andReturn($forecast);
 
         $w = new Weather($provider);
-        $this->assertSame(['forecasts' => []], $w->getForecastsWeather('北京'));
+        $this->assertSame($forecast, $w->getForecastsWeather('北京'));
+    }
+
+    public function testBackwardCompatGetWeather()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $weather = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
+        $provider->expects()->getLiveWeather('深圳')->andReturn($weather);
+
+        $w = new Weather($provider);
+        $array = $w->getWeather('深圳', 'base');
+
+        $this->assertSame('深圳市', $array['city']);
+        $this->assertSame(26.0, $array['temperature']);
     }
 
     public function testBackwardCompatHttpClientWithAMap()
