@@ -82,6 +82,23 @@ header h1 {
     color: #991b1b;
 }
 
+.hidden {
+    display: none !important;
+}
+
+.loading {
+    text-align: center;
+    padding: 30px;
+    color: #fff;
+    font-size: 1.1rem;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 .alert-warning {
     background: #fef3c7;
     color: #92400e;
