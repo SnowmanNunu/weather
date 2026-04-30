@@ -1,49 +1,59 @@
 <?php
 
-/*
- * This file is part of the snowmannunu/weather.
- *
- * (c) SnowmanNunu<345750542@qq.com>
- *
- * This source file is subject to the MIT license that is bundled
- * with this source code in the file LICENSE.
- */
+declare(strict_types=1);
 
 namespace SnowmanNunu\Weather;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\TransferException;
+use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Providers\AMapProvider;
 
-class Weather
+class Weather implements Provider
 {
-    protected $key;
-    protected $guzzleOptions = [];
-    protected $httpClient;
+    protected Provider $provider;
+    protected ?\Psr\SimpleCache\CacheInterface $cache = null;
+    protected int $cacheTtl = 300;
 
-    public function __construct(string $key)
+    /**
+     * @param string|Provider $keyOrProvider API key string or a Provider instance
+     */
+    public function __construct($keyOrProvider)
     {
-        $this->key = $key;
-    }
-
-    public function getHttpClient(): Client
-    {
-        if (!$this->httpClient instanceof Client) {
-            $this->httpClient = new Client($this->guzzleOptions);
+        if ($keyOrProvider instanceof Provider) {
+            $this->provider = $keyOrProvider;
+        } elseif (is_string($keyOrProvider) && !empty($keyOrProvider)) {
+            $this->provider = new AMapProvider($keyOrProvider);
+        } else {
+            throw new InvalidArgumentException('API key must be a non-empty string or a Provider instance.');
         }
-
-        return $this->httpClient;
     }
 
-    public function setHttpClient(Client $client): void
+    public function getProvider(): Provider
     {
-        $this->httpClient = $client;
+        return $this->provider;
     }
 
-    public function setGuzzleOptions(array $options): void
+    public function setProvider(Provider $provider): self
     {
-        $this->guzzleOptions = $options;
-        $this->httpClient = null;
+        $this->provider = $provider;
+
+        return $this;
+    }
+
+    public function withCache(\Psr\SimpleCache\CacheInterface $cache, int $ttl = 300): self
+    {
+        $this->cache = $cache;
+        $this->cacheTtl = $ttl;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->provider->getName();
     }
 
     public function getLiveWeather(string $city, string $format = 'json')
@@ -58,38 +68,63 @@ class Weather
 
     public function getWeather(string $city, string $type = 'base', string $format = 'json')
     {
-        $url = 'https://restapi.amap.com/v3/weather/weatherInfo';
+        $cacheKey = sprintf('weather:%s:%s:%s:%s', $this->getName(), md5($city), $type, $format);
 
-        if (empty($city)) {
-            throw new InvalidArgumentException('City name cannot be empty.');
+        if ($this->cache !== null) {
+            try {
+                $cached = $this->cache->get($cacheKey);
+                if ($cached !== null) {
+                    return $cached;
+                }
+            } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+                // ignore cache read errors
+            }
         }
 
-        $format = \strtolower($format);
-        $type = \strtolower($type);
+        $result = $this->provider->getWeather($city, $type, $format);
 
-        if (!\in_array($format, ['xml', 'json'], true)) {
-            throw new InvalidArgumentException('Invalid response format: '.$format);
+        if ($this->cache !== null) {
+            try {
+                $this->cache->set($cacheKey, $result, $this->cacheTtl);
+            } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+                // ignore cache write errors
+            }
         }
 
-        if (!\in_array($type, ['base', 'all'], true)) {
-            throw new InvalidArgumentException('Invalid type value(base/all): '.$type);
+        return $result;
+    }
+
+    /**
+     * Backward compatibility: proxy to provider's HTTP client methods.
+     */
+    public function getHttpClient(): Client
+    {
+        if ($this->provider instanceof AMapProvider) {
+            return $this->provider->getHttpClient();
         }
 
-        $query = array_filter([
-            'key' => $this->key,
-            'city' => $city,
-            'output' => $format,
-            'extensions' => $type,
-        ]);
+        throw new \BadMethodCallException('getHttpClient() is only available when using AMapProvider.');
+    }
 
-        try {
-            $response = $this->getHttpClient()->get($url, [
-                'query' => $query,
-            ])->getBody()->getContents();
+    public function setHttpClient(Client $client): void
+    {
+        if ($this->provider instanceof AMapProvider) {
+            $this->provider->setHttpClient($client);
 
-            return 'json' === $format ? \json_decode($response, true) : $response;
-        } catch (\Exception $e) {
-            throw new HttpException($e->getMessage(), $e->getCode(), $e);
+            return;
         }
+
+        throw new \BadMethodCallException('setHttpClient() is only available when using AMapProvider.');
+    }
+
+    public function setGuzzleOptions(array $options): void
+    {
+        if ($this->provider instanceof AMapProvider) {
+            $this->provider->setGuzzleOptions($options);
+
+            return;
+        }
+
+        throw new \BadMethodCallException('setGuzzleOptions() is only available when using AMapProvider.');
     }
 }

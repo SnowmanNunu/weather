@@ -1,0 +1,10 @@
+parameters:
+    level: 5
+    paths:
+        - src
+    excludePaths:
+        - src/ServiceProvider.php
+    ignoreErrors:
+        - '#no value type specified in iterable type array#'
+        - '#Call to function is_string\(\) with string will always evaluate to true#'
+    reportUnmatchedIgnoredErrors: false

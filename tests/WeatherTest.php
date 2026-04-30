@@ -1,184 +1,139 @@
 <?php
 
-/*
- * This file is part of the snowmannunu/weather.
- *
- * (c) SnowmanNunu<345750542@qq.com>
- *
- * This source file is subject to the MIT license that is bundled
- * with this source code in the file LICENSE.
- */
+declare(strict_types=1);
 
 namespace SnowmanNunu\Weather\Tests;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Psr7\Response;
-use Mockery\Matcher\AnyArgs;
-use SnowmanNunu\Weather\Exceptions\HttpException;
+use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Providers\AMapProvider;
+use SnowmanNunu\Weather\Providers\QWeatherProvider;
 use SnowmanNunu\Weather\Weather;
 use PHPUnit\Framework\TestCase;
 
 class WeatherTest extends TestCase
 {
-    public function testGetWeather()
-    {
-        // json
-        $response = new Response(200, [], '{"success": true}');
-        $client = \Mockery::mock(Client::class);
-        $client->allows()->get('https://restapi.amap.com/v3/weather/weatherInfo', [
-            'query' => [
-                'key' => 'mock-key',
-                'city' => '深圳',
-                'output' => 'json',
-                'extensions' => 'base',
-            ],
-        ])->andReturn($response);
-
-        $w = \Mockery::mock(Weather::class, ['mock-key'])->makePartial();
-        $w->allows()->getHttpClient()->andReturn($client);
-
-        $this->assertSame(['success' => true], $w->getWeather('深圳'));
-
-        // xml
-        $response = new Response(200, [], '<hello>content</hello>');
-        $client = \Mockery::mock(Client::class);
-        $client->allows()->get('https://restapi.amap.com/v3/weather/weatherInfo', [
-            'query' => [
-                'key' => 'mock-key',
-                'city' => '深圳',
-                'extensions' => 'all',
-                'output' => 'xml',
-            ],
-        ])->andReturn($response);
-
-        $w = \Mockery::mock(Weather::class, ['mock-key'])->makePartial();
-        $w->allows()->getHttpClient()->andReturn($client);
-
-        $this->assertSame('<hello>content</hello>', $w->getWeather('深圳', 'all', 'xml'));
-    }
-
-    public function testGetHttpClient()
+    public function testConstructorWithStringKey()
     {
         $w = new Weather('mock-key');
-
-        // 断言返回结果为 GuzzleHttp\ClientInterface 实例
-        $this->assertInstanceOf(ClientInterface::class, $w->getHttpClient());
+        $this->assertSame('amap', $w->getName());
+        $this->assertInstanceOf(AMapProvider::class, $w->getProvider());
     }
 
-    public function testGetWeatherWithEmptyCity()
+    public function testConstructorWithProvider()
     {
-        $w = new Weather('mock-key');
+        $provider = new QWeatherProvider('mock-key');
+        $w = new Weather($provider);
+        $this->assertSame('qweather', $w->getName());
+        $this->assertSame($provider, $w->getProvider());
+    }
 
+    public function testConstructorWithEmptyKey()
+    {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('City name cannot be empty.');
-
-        $w->getWeather('');
+        new Weather('');
     }
 
-    public function testGetHttpClientReturnsSameInstance()
+    public function testSetProvider()
     {
         $w = new Weather('mock-key');
+        $newProvider = new QWeatherProvider('another-key');
 
-        $client1 = $w->getHttpClient();
-        $client2 = $w->getHttpClient();
+        $w->setProvider($newProvider);
 
-        $this->assertSame($client1, $client2);
-        $this->assertInstanceOf(ClientInterface::class, $client1);
+        $this->assertSame($newProvider, $w->getProvider());
+        $this->assertSame('qweather', $w->getName());
     }
 
-    public function testSetHttpClient()
+    public function testDelegationToProvider()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->expects()->getWeather('深圳', 'base', 'json')->andReturn(['status' => '1']);
+
+        $w = new Weather($provider);
+        $result = $w->getWeather('深圳');
+
+        $this->assertSame(['status' => '1'], $result);
+    }
+
+    public function testCacheHit()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->shouldNotReceive('getWeather');
+
+        $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
+        $cacheKey = 'weather:mock:' . md5('深圳') . ':base:json';
+        $cache->allows()->get($cacheKey)->andReturn(['cached' => true]);
+
+        $w = new Weather($provider);
+        $w->withCache($cache);
+
+        $this->assertSame(['cached' => true], $w->getWeather('深圳'));
+    }
+
+    public function testCacheMissAndStore()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->expects()->getWeather('深圳', 'base', 'json')->once()->andReturn(['live' => true]);
+
+        $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
+        $cacheKey = 'weather:mock:' . md5('深圳') . ':base:json';
+        $cache->allows()->get($cacheKey)->andReturn(null);
+        $cache->expects()->set($cacheKey, ['live' => true], 300)->once();
+
+        $w = new Weather($provider);
+        $w->withCache($cache);
+
+        $this->assertSame(['live' => true], $w->getWeather('深圳'));
+    }
+
+    public function testGetLiveWeatherDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->expects()->getWeather('北京', 'base', 'json')->andReturn(['temp' => '25']);
+
+        $w = new Weather($provider);
+        $this->assertSame(['temp' => '25'], $w->getLiveWeather('北京'));
+    }
+
+    public function testGetForecastsWeatherDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->expects()->getWeather('北京', 'all', 'json')->andReturn(['forecasts' => []]);
+
+        $w = new Weather($provider);
+        $this->assertSame(['forecasts' => []], $w->getForecastsWeather('北京'));
+    }
+
+    public function testBackwardCompatHttpClientWithAMap()
     {
         $w = new Weather('mock-key');
-        $customClient = new Client(['timeout' => 10]);
+        $client = new Client();
+        $w->setHttpClient($client);
 
-        $w->setHttpClient($customClient);
-
-        $this->assertSame($customClient, $w->getHttpClient());
+        $this->assertSame($client, $w->getHttpClient());
     }
 
-    public function testSetGuzzleOptions()
+    public function testBackwardCompatGuzzleOptionsWithAMap()
     {
         $w = new Weather('mock-key');
+        $w->setGuzzleOptions(['timeout' => 10]);
 
-        // 设置参数前，timeout 为 null
-        $this->assertNull($w->getHttpClient()->getConfig('timeout'));
-
-        // 设置参数后会清空缓存的 client
-        $w->setGuzzleOptions(['timeout' => 5000]);
-
-        // 设置参数后，timeout 为 5000
-        $this->assertSame(5000, $w->getHttpClient()->getConfig('timeout'));
+        $this->assertSame(10, $w->getHttpClient()->getConfig('timeout'));
     }
 
-    // 检查 $type 参数
-    public function testGetWeatherWithInvalidType()
+    public function testHttpClientThrowsForNonAMap()
     {
-        $w = new Weather('mock-key');
+        $provider = new QWeatherProvider('key');
+        $w = new Weather($provider);
 
-        // 断言会抛出此异常类
-        $this->expectException(InvalidArgumentException::class);
-
-        // 断言异常消息为 'Invalid type value(base/all): foo'
-        $this->expectExceptionMessage('Invalid type value(base/all): foo');
-
-        $w->getWeather('深圳', 'foo');
-
-        $this->fail('Failed to assert getWeather throw exception with invalid argument.');
-    }
-
-    // 检查 $format 参数
-    public function testGetWeatherWithInvalidFormat()
-    {
-        $w = new Weather('mock-key');
-
-        // 断言会抛出此异常类
-        $this->expectException(InvalidArgumentException::class);
-
-        // 断言异常消息为 'Invalid response format: array'
-        $this->expectExceptionMessage('Invalid response format: array');
-
-        // 因为支持的格式为 xml/json，所以传入 array 会抛出异常
-        $w->getWeather('深圳', 'base', 'array');
-
-        // 如果没有抛出异常，就会运行到这行，标记当前测试没成功
-        $this->fail('Failed to assert getWeather throw exception with invalid argument.');
-    }
-
-    public function testGetWeatherWithGuzzleRuntimeException()
-    {
-        $client = \Mockery::mock(Client::class);
-        $client->allows()
-            ->get(new AnyArgs()) // 由于上面的用例已经验证过参数传递，所以这里就不关心参数了。
-            ->andThrow(new \Exception('request timeout')); // 当调用 get 方法时会抛出异常。
-
-        $w = \Mockery::mock(Weather::class, ['mock-key'])->makePartial();
-        $w->allows()->getHttpClient()->andReturn($client);
-
-        $this->expectException(HttpException::class);
-        $this->expectExceptionMessage('request timeout');
-
-        $w->getWeather('深圳');
-    }
-
-    public function testGetLiveWeather()
-    {
-        // 将 getWeather 接口模拟为返回固定内容，以测试参数传递是否正确
-        $w = \Mockery::mock(Weather::class, ['mock-key'])->makePartial();
-        $w->expects()->getWeather('深圳', 'base', 'json')->andReturn(['success' => true]);
-
-        // 断言正确传参并返回
-        $this->assertSame(['success' => true], $w->getLiveWeather('深圳'));
-    }
-
-    public function testGetForecastsWeather()
-    {
-        // 将 getWeather 接口模拟为返回固定内容，以测试参数传递是否正确
-        $w = \Mockery::mock(Weather::class, ['mock-key'])->makePartial();
-        $w->expects()->getWeather('深圳', 'all', 'json')->andReturn(['success' => true]);
-
-        // 断言正确传参并返回
-        $this->assertSame(['success' => true], $w->getForecastsWeather('深圳'));
+        $this->expectException(\BadMethodCallException::class);
+        $w->getHttpClient();
     }
 }

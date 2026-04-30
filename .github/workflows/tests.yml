@@ -1,4 +1,4 @@
-name: Tests
+name: CI
 
 on:
   push:
@@ -6,15 +6,15 @@ on:
   pull_request:
 
 jobs:
-  phpunit:
+  tests:
     strategy:
       matrix:
-        php_version: ['7.3', '7.4', '8.0', '8.1', '8.2', '8.3']
+        php_version: ['8.0', '8.1', '8.2', '8.3']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP environment
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php_version }}
@@ -25,3 +25,23 @@ jobs:
 
       - name: Run PHPUnit
         run: ./vendor/bin/phpunit --coverage-text
+
+  code-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install --no-interaction --prefer-dist
+      - run: ./vendor/bin/phpcs src tests --standard=PSR12
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install --no-interaction --prefer-dist
+      - run: ./vendor/bin/phpstan analyse --no-progress
