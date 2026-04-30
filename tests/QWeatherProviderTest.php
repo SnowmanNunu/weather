@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
+use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 use SnowmanNunu\Weather\Providers\QWeatherProvider;
@@ -120,6 +121,45 @@ class QWeatherProviderTest extends TestCase
 
         $this->expectException(HttpException::class);
         $provider->getLiveWeather('深圳');
+    }
+
+    public function testGetLifeIndices()
+    {
+        $client = $this->mockClient([
+            'code' => '200',
+            'daily' => [
+                [
+                    'name' => '运动指数',
+                    'level' => '1',
+                    'category' => '适宜',
+                    'text' => '天气不错，适宜户外运动。',
+                    'type' => '1',
+                ],
+            ],
+        ]);
+
+        $provider = new QWeatherProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $indices = $provider->getLifeIndices('深圳');
+
+        $this->assertCount(1, $indices);
+        $this->assertInstanceOf(LifeIndex::class, $indices[0]);
+        $this->assertSame('运动指数', $indices[0]->name);
+        $this->assertSame('适宜', $indices[0]->category);
+    }
+
+    public function testGetLifeIndicesReturnsEmptyOnError()
+    {
+        $client = $this->mockClient(['code' => '404', 'daily' => []]);
+
+        $provider = new QWeatherProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $indices = $provider->getLifeIndices('深圳');
+
+        $this->assertIsArray($indices);
+        $this->assertCount(0, $indices);
     }
 
     public function testName()

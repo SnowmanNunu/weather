@@ -145,6 +145,20 @@ class WeatherTest extends TestCase
         $this->assertSame(10, $w->getHttpClient()->getConfig('timeout'));
     }
 
+    public function testGetLifeIndicesDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $index = new \SnowmanNunu\Weather\DTO\LifeIndex('运动指数', '1', '适宜', '天气不错', 'sport');
+        $provider->expects()->getLifeIndices('北京')->andReturn([$index]);
+
+        $w = new Weather($provider);
+        $result = $w->getLifeIndices('北京');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('运动指数', $result[0]->name);
+    }
+
     public function testHttpClientThrowsForNonAMap()
     {
         $provider = new QWeatherProvider('key');

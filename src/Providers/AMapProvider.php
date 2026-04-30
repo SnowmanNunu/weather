@@ -10,6 +10,7 @@ use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
+use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -145,6 +146,45 @@ class AMapProvider implements Provider
             return is_array($decoded) ? $decoded : [];
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
+        }
+    }
+
+    public function getLifeIndices(string $city): array
+    {
+        $url = 'https://restapi.amap.com/v3/weather/lifestyle';
+
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'city' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['status'] ?? '0') !== '1') {
+                return [];
+            }
+
+            $indices = [];
+            foreach ($data['lifestyles'] ?? [] as $item) {
+                $indices[] = new LifeIndex(
+                    name: $item['name'] ?? '',
+                    level: $item['level'] ?? '',
+                    category: $item['category'] ?? '',
+                    advice: $item['text'] ?? '',
+                    type: $item['type'] ?? '',
+                );
+            }
+
+            return $indices;
+        } catch (TransferException $e) {
+            return [];
         }
     }
 

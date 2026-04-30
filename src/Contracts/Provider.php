@@ -6,6 +6,7 @@ namespace SnowmanNunu\Weather\Contracts;
 
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
+use SnowmanNunu\Weather\DTO\LifeIndex;
 
 interface Provider
 {
@@ -28,6 +29,16 @@ interface Provider
      * @throws \SnowmanNunu\Weather\Exceptions\InvalidArgumentException
      */
     public function getForecastsWeather(string $city): Forecast;
+
+    /**
+     * Get lifestyle indices for a city.
+     *
+     * @param string $city City name or adcode
+     * @return LifeIndex[]
+     * @throws \SnowmanNunu\Weather\Exceptions\HttpException
+     * @throws \SnowmanNunu\Weather\Exceptions\InvalidArgumentException
+     */
+    public function getLifeIndices(string $city): array;
 
     /**
      * Provider name identifier.

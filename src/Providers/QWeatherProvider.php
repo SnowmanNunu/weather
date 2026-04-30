@@ -10,6 +10,7 @@ use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
+use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -118,6 +119,47 @@ class QWeatherProvider implements Provider
             adcode: $data['location']['id'] ?? '',
             casts: $casts,
         );
+    }
+
+    public function getLifeIndices(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri . '/indices/1d';
+        $types = '1,2,3,5,6,8,9';
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'location' => $city,
+                    'type' => $types,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                return [];
+            }
+
+            $indices = [];
+            foreach ($data['daily'] ?? [] as $item) {
+                $indices[] = new LifeIndex(
+                    name: $item['name'] ?? '',
+                    level: $item['level'] ?? '',
+                    category: $item['category'] ?? '',
+                    advice: $item['text'] ?? '',
+                    type: $item['type'] ?? '',
+                );
+            }
+
+            return $indices;
+        } catch (TransferException $e) {
+            return [];
+        }
     }
 
     /**

@@ -73,6 +73,19 @@
       html += '</div>';
     }
 
+    if (data.indices && data.indices.length > 0) {
+      html += '<h2 class="section-title">生活指数</h2>';
+      html += '<div class="indices-grid">';
+      data.indices.forEach((idx) => {
+        html += `<div class="card index">
+          <div class="index-name">${escapeHtml(idx.name)}</div>
+          <div class="index-level">${escapeHtml(idx.category)}</div>
+          <div class="index-advice">${escapeHtml(idx.advice)}</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+
     els.result.innerHTML = html;
   }
 

@@ -37,12 +37,14 @@ try {
 
     $current = $weather->getLiveWeather($city);
     $forecast = $weather->getForecastsWeather($city);
+    $indices = $weather->getLifeIndices($city);
 
     echo json_encode([
         'success' => true,
         'provider' => $weather->getName(),
         'current' => $current->toArray(),
         'forecast' => $forecast->toArray(),
+        'indices' => array_map(static fn ($i) => $i->toArray(), $indices),
     ], JSON_UNESCAPED_UNICODE);
 } catch (\Throwable $e) {
     http_response_code(500);

@@ -133,6 +133,15 @@ class OpenWeatherMapProviderTest extends TestCase
         $provider->getLiveWeather('Beijing');
     }
 
+    public function testGetLifeIndicesReturnsEmpty()
+    {
+        $provider = new OpenWeatherMapProvider('key');
+        $indices = $provider->getLifeIndices('Beijing');
+
+        $this->assertIsArray($indices);
+        $this->assertCount(0, $indices);
+    }
+
     public function testName()
     {
         $provider = new OpenWeatherMapProvider('key');

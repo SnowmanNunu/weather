@@ -89,6 +89,33 @@ class Weather
     }
 
     /**
+     * @return \SnowmanNunu\Weather\DTO\LifeIndex[]
+     */
+    public function getLifeIndices(string $city): array
+    {
+        $cacheKey = sprintf('weather:%s:%s:indices', $this->getName(), md5($city));
+
+        try {
+            $cached = $this->cache?->get($cacheKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+            // ignore
+        }
+
+        $result = $this->provider->getLifeIndices($city);
+
+        try {
+            $this->cache?->set($cacheKey, $result, $this->cacheTtl);
+        } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+            // ignore
+        }
+
+        return $result;
+    }
+
+    /**
      * Backward compatibility. Returns raw array representation.
      *
      * @return array<string, mixed>

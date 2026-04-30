@@ -225,6 +225,41 @@ header h1 {
     color: #9ca3af;
 }
 
+.indices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+}
+
+.index {
+    padding: 18px 14px;
+    transition: transform 0.15s;
+}
+
+.index:hover {
+    transform: translateY(-4px);
+}
+
+.index-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 6px;
+}
+
+.index-level {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 8px;
+}
+
+.index-advice {
+    font-size: 0.85rem;
+    color: #374151;
+    line-height: 1.4;
+}
+
 footer {
     text-align: center;
     padding: 30px 0;

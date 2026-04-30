@@ -10,6 +10,7 @@ use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
+use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -72,6 +73,11 @@ class OpenWeatherMapProvider implements Provider
         $data = $this->request('/forecast', $city);
 
         return $this->normalizeForecast($data);
+    }
+
+    public function getLifeIndices(string $city): array
+    {
+        return [];
     }
 
     /**
