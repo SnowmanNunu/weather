@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  weather:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - WEATHER_PROVIDER=${WEATHER_PROVIDER:-amap}
+      - WEATHER_KEY=${WEATHER_KEY}
+    volumes:
+      - ./public:/var/www/weather/public:ro
+      - ./src:/var/www/weather/src:ro

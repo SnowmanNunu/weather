@@ -21,6 +21,7 @@ class ServiceProvider extends LaravelServiceProvider
 
             $provider = match ($driver) {
                 'qweather' => new \SnowmanNunu\Weather\Providers\QWeatherProvider($key),
+                'openweathermap' => new \SnowmanNunu\Weather\Providers\OpenWeatherMapProvider($key),
                 default => new AMapProvider($key),
             };
 

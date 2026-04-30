@@ -7,6 +7,7 @@ require __DIR__ . '/../vendor/autoload.php';
 use SnowmanNunu\Weather\Weather;
 use SnowmanNunu\Weather\Providers\AMapProvider;
 use SnowmanNunu\Weather\Providers\QWeatherProvider;
+use SnowmanNunu\Weather\Providers\OpenWeatherMapProvider;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -29,6 +30,7 @@ if (empty($city)) {
 try {
     $provider = match ($providerName) {
         'qweather' => new QWeatherProvider($key),
+        'openweathermap' => new OpenWeatherMapProvider($key),
         default => new AMapProvider($key),
     };
     $weather = new Weather($provider);
