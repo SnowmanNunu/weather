@@ -19,46 +19,61 @@ class Weather
 {
     protected $key;
     protected $guzzleOptions = [];
+    protected $httpClient;
 
     public function __construct(string $key)
     {
         $this->key = $key;
     }
 
-    public function getHttpClient()
+    public function getHttpClient(): Client
     {
-        return new Client($this->guzzleOptions);
+        if (!$this->httpClient instanceof Client) {
+            $this->httpClient = new Client($this->guzzleOptions);
+        }
+
+        return $this->httpClient;
     }
 
-    public function setGuzzleOptions(array $options)
+    public function setHttpClient(Client $client): void
+    {
+        $this->httpClient = $client;
+    }
+
+    public function setGuzzleOptions(array $options): void
     {
         $this->guzzleOptions = $options;
+        $this->httpClient = null;
     }
 
-    public function getLiveWeather($city, $format = 'json')
+    public function getLiveWeather(string $city, string $format = 'json')
     {
         return $this->getWeather($city, 'base', $format);
     }
 
-    public function getForecastsWeather($city, $format = 'json')
+    public function getForecastsWeather(string $city, string $format = 'json')
     {
         return $this->getWeather($city, 'all', $format);
     }
 
-    public function getWeather($city, $type = 'base', $format = 'json')
+    public function getWeather(string $city, string $type = 'base', string $format = 'json')
     {
         $url = 'https://restapi.amap.com/v3/weather/weatherInfo';
 
-        if (!\in_array(\strtolower($format), ['xml', 'json'])) {
-            throw new InvalidArgumentException('Invalid response format: '.$format);
-        }
-
-        if (!\in_array(\strtolower($type), ['base', 'all'])) {
-            throw new InvalidArgumentException('Invalid type value(base/all): '.$type);
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
         }
 
         $format = \strtolower($format);
         $type = \strtolower($type);
+
+        if (!\in_array($format, ['xml', 'json'], true)) {
+            throw new InvalidArgumentException('Invalid response format: '.$format);
+        }
+
+        if (!\in_array($type, ['base', 'all'], true)) {
+            throw new InvalidArgumentException('Invalid type value(base/all): '.$type);
+        }
 
         $query = array_filter([
             'key' => $this->key,

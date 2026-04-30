@@ -37,23 +37,65 @@ $response = $weather->getLiveWeather('深圳');
 ### 获取近期天气预报
 ```php
 $response = $weather->getForecastsWeather('深圳');
+```
 
+### 错误处理
+
+```php
+use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Exceptions\HttpException;
+
+try {
+    $response = $weather->getLiveWeather('深圳');
+} catch (InvalidArgumentException $e) {
+    // 参数错误（如城市为空、格式不支持等）
+    echo $e->getMessage();
+} catch (HttpException $e) {
+    // 网络请求异常
+    echo $e->getMessage();
+}
+```
+
+### 自定义 Guzzle 配置
+
+```php
+// 设置超时时间（单位：秒）
+$weather->setGuzzleOptions(['timeout' => 5.0]);
+
+// 或者设置代理
+$weather->setGuzzleOptions([
+    'proxy' => 'http://proxy.example.com:8080',
+]);
 ```
 
 ## Used in Laravel
 
-在 Laravel 中使用也是同样的安装方式，配置写在 config/services.php 中：
+在 Laravel 中使用也是同样的安装方式，配置写在 `config/services.php` 中：
+
 ```php
 'weather' => [
    'key' => env('WEATHER_API_KEY'),
 ],
 ```
-在 .env 中配置 WEATHER_API_KEY ：
-```php
+
+在 `.env` 中配置 `WEATHER_API_KEY`：
+
+```env
 WEATHER_API_KEY=your key
 ```
 
-TODO
+然后在代码中通过 Facade 或依赖注入使用：
+
+```php
+use SnowmanNunu\Weather\Weather;
+
+// 依赖注入
+public function index(Weather $weather)
+{
+    $live = $weather->getLiveWeather('深圳');
+    $forecast = $weather->getForecastsWeather('深圳');
+}
+```
 
 ## Contributing
 

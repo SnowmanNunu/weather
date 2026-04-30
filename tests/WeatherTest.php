@@ -67,6 +67,37 @@ class WeatherTest extends TestCase
         $this->assertInstanceOf(ClientInterface::class, $w->getHttpClient());
     }
 
+    public function testGetWeatherWithEmptyCity()
+    {
+        $w = new Weather('mock-key');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('City name cannot be empty.');
+
+        $w->getWeather('');
+    }
+
+    public function testGetHttpClientReturnsSameInstance()
+    {
+        $w = new Weather('mock-key');
+
+        $client1 = $w->getHttpClient();
+        $client2 = $w->getHttpClient();
+
+        $this->assertSame($client1, $client2);
+        $this->assertInstanceOf(ClientInterface::class, $client1);
+    }
+
+    public function testSetHttpClient()
+    {
+        $w = new Weather('mock-key');
+        $customClient = new Client(['timeout' => 10]);
+
+        $w->setHttpClient($customClient);
+
+        $this->assertSame($customClient, $w->getHttpClient());
+    }
+
     public function testSetGuzzleOptions()
     {
         $w = new Weather('mock-key');
@@ -74,7 +105,7 @@ class WeatherTest extends TestCase
         // 设置参数前，timeout 为 null
         $this->assertNull($w->getHttpClient()->getConfig('timeout'));
 
-        // 设置参数
+        // 设置参数后会清空缓存的 client
         $w->setGuzzleOptions(['timeout' => 5000]);
 
         // 设置参数后，timeout 为 5000

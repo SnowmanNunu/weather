@@ -15,7 +15,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
 {
     protected $defer = true;
 
-    public function register()
+    public function register(): void
     {
         $this->app->singleton(Weather::class, function () {
             return new Weather(config('services.weather.key'));
@@ -24,7 +24,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->app->alias(Weather::class, 'weather');
     }
 
-    public function provides()
+    public function provides(): array
     {
         return [Weather::class, 'weather'];
     }
