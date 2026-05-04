@@ -6,6 +6,8 @@ namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
@@ -17,6 +19,8 @@ use SnowmanNunu\Weather\DTO\Precipitation;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Exceptions\InvalidKeyException;
+use SnowmanNunu\Weather\Exceptions\RateLimitException;
 
 class QWeatherProvider implements Provider
 {
@@ -48,10 +52,34 @@ class QWeatherProvider implements Provider
     public function getHttpClient(): Client
     {
         if (!$this->httpClient instanceof Client) {
+            $stack = HandlerStack::create();
+            $stack->push(Middleware::retry(
+                function ($retries, $request, $response = null, $exception = null) {
+                    if ($retries >= 2) {
+                        return false;
+                    }
+                    if ($exception instanceof TransferException) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() >= 500) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() === 429) {
+                        return true;
+                    }
+
+                    return false;
+                },
+                function ($retries) {
+                    return 100 * (2 ** $retries);
+                }
+            ));
+
             $this->httpClient = new Client(array_merge([
                 'timeout' => 10,
                 'connect_timeout' => 5,
                 'headers' => ['Connection' => 'close'],
+                'handler' => $stack,
             ], $this->guzzleOptions));
         }
 
@@ -532,11 +560,39 @@ class QWeatherProvider implements Provider
             ])->getBody()->getContents();
 
             $decoded = json_decode($response, true);
+            $data = is_array($decoded) ? $decoded : [];
+            $this->throwOnErrorCode($data);
 
-            return is_array($decoded) ? $decoded : [];
+            return $data;
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @throws InvalidKeyException
+     * @throws RateLimitException
+     * @throws HttpException
+     */
+    protected function throwOnErrorCode(array $data): void
+    {
+        $code = $data['code'] ?? '';
+        if ($code === '200' || $code === '') {
+            return;
+        }
+
+        $message = 'QWeather API returned error code: ' . $code;
+
+        if ($code === '401') {
+            throw new InvalidKeyException($message);
+        }
+
+        if ($code === '402') {
+            throw new RateLimitException($message);
+        }
+
+        throw new HttpException($message);
     }
 
     protected function withLang(array $query): array

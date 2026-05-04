@@ -18,7 +18,10 @@
 - **Laravel 集成**：ServiceProvider + Facade 开箱即用
 - **Web 演示**：内置 SPA 天气查询页面，支持 IP 自动定位与中英文切换
 - **多语言 i18n**：SDK 与演示站点均支持 `zh` / `en`，通过环境变量或 URL 参数切换
-- **代码质量**：PHPUnit + PHPStan Level 5 + PHPCS PSR-12，CI 全自动检查
+- **并发请求**：内置 `fetchAll()` 批量接口，6 个 API 并行发送，响应时间从 ~1.5s 降至 ~0.3s
+- **自动重试**：网络超时 / 服务端 5xx / 429 限流时自动指数退避重试（最多 2 次）
+- **精细化异常**：`InvalidKeyException` / `RateLimitException` / `HttpException`，便于调用方精准处理
+- **代码质量**：PHPUnit + PHPStan Level 8 + PHPCS PSR-12，CI 全自动检查
 
 ---
 
@@ -97,6 +100,38 @@ echo $current->windDirection; // NW
 
 > 支持的 Provider：和风天气（`zh`/`en`）、OpenWeatherMap（多语言）、高德地图（返回中文）。
 > 语言信息会自动写入缓存 key，中英文缓存互不干扰。
+
+### 批量并发查询
+
+一次性获取所有数据（实时天气 + 预报 + 生活指数 + AQI + 预警 + 分钟降水），SDK 内部并行发送请求：
+
+```php
+$all = $weather->getAll('北京');
+
+echo $all['current']->temperature;   // 26
+echo $all['forecast']->casts[0]->dayWeather; // 晴
+echo $all['aqi']->aqi;              // 45
+```
+
+### 异常处理
+
+SDK 对常见错误做了分类，方便调用方精准处理：
+
+```php
+use SnowmanNunu\Weather\Exceptions\InvalidKeyException;
+use SnowmanNunu\Weather\Exceptions\RateLimitException;
+use SnowmanNunu\Weather\Exceptions\HttpException;
+
+try {
+    $current = $weather->getLiveWeather('北京');
+} catch (InvalidKeyException $e) {
+    // API Key 无效
+} catch (RateLimitException $e) {
+    // 超过调用频次，建议稍后重试
+} catch (HttpException $e) {
+    // 网络错误或其他 HTTP 异常
+}
+```
 
 ---
 

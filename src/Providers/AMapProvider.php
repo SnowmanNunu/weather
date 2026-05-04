@@ -6,6 +6,8 @@ namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
@@ -16,6 +18,8 @@ use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Exceptions\InvalidKeyException;
+use SnowmanNunu\Weather\Exceptions\RateLimitException;
 
 class AMapProvider implements Provider
 {
@@ -46,7 +50,32 @@ class AMapProvider implements Provider
     public function getHttpClient(): Client
     {
         if (!$this->httpClient instanceof Client) {
-            $this->httpClient = new Client($this->guzzleOptions);
+            $stack = HandlerStack::create();
+            $stack->push(Middleware::retry(
+                function ($retries, $request, $response = null, $exception = null) {
+                    if ($retries >= 2) {
+                        return false;
+                    }
+                    if ($exception instanceof TransferException) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() >= 500) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() === 429) {
+                        return true;
+                    }
+
+                    return false;
+                },
+                function ($retries) {
+                    return 100 * (2 ** $retries);
+                }
+            ));
+
+            $this->httpClient = new Client(array_merge([
+                'handler' => $stack,
+            ], $this->guzzleOptions));
         }
 
         return $this->httpClient;
@@ -157,11 +186,39 @@ class AMapProvider implements Provider
             ])->getBody()->getContents();
 
             $decoded = json_decode($response, true);
+            $data = is_array($decoded) ? $decoded : [];
+            $this->throwOnErrorInfo($data);
 
-            return is_array($decoded) ? $decoded : [];
+            return $data;
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @throws InvalidKeyException
+     * @throws RateLimitException
+     * @throws HttpException
+     */
+    protected function throwOnErrorInfo(array $data): void
+    {
+        if (($data['status'] ?? '0') === '1') {
+            return;
+        }
+
+        $info = $data['info'] ?? 'UNKNOWN_ERROR';
+        $message = 'AMap API error: ' . $info;
+
+        if (in_array($info, ['INVALID_USER_KEY', 'INVALID_USER_SCODE', 'USERKEY_PLAT_NOMATCH'], true)) {
+            throw new InvalidKeyException($message);
+        }
+
+        if ($info === 'OVER_LIMIT') {
+            throw new RateLimitException($message);
+        }
+
+        throw new HttpException($message);
     }
 
     public function getLifeIndices(string $city): array
