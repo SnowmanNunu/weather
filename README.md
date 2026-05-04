@@ -80,6 +80,24 @@ $weather = new Weather('your-key');
 $weather->withCache($cache, 600); // 缓存 10 分钟
 ```
 
+### 切换语言
+
+SDK 支持中英文输出，通过 `setLang()` 链式调用即可切换：
+
+```php
+use SnowmanNunu\Weather\Weather;
+use SnowmanNunu\Weather\Providers\QWeatherProvider;
+
+$weather = (new Weather(new QWeatherProvider('your-key')))->setLang('en');
+$current = $weather->getLiveWeather('Beijing');
+
+echo $current->weather;     // Sunny
+echo $current->windDirection; // NW
+```
+
+> 支持的 Provider：和风天气（`zh`/`en`）、OpenWeatherMap（多语言）、高德地图（返回中文）。
+> 语言信息会自动写入缓存 key，中英文缓存互不干扰。
+
 ---
 
 ## 🔌 Laravel 集成
