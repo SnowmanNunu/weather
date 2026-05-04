@@ -12,8 +12,13 @@ use SnowmanNunu\Weather\Providers\OpenWeatherMapProvider;
 header('Content-Type: application/json; charset=utf-8');
 
 $providerName = getenv('WEATHER_PROVIDER') ?: 'amap';
-$key = getenv('WEATHER_KEY') ?: '';
 $city = $_GET['city'] ?? '';
+
+$key = match ($providerName) {
+    'qweather' => getenv('QWEATHER_KEY') ?: getenv('WEATHER_KEY') ?: '',
+    'openweathermap' => getenv('OPENWEATHERMAP_KEY') ?: getenv('WEATHER_KEY') ?: '',
+    default => getenv('WEATHER_KEY') ?: '',
+};
 
 if (empty($key)) {
     http_response_code(500);
