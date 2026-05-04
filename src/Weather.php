@@ -79,7 +79,7 @@ class Weather
         $cacheKey = sprintf('weather:%s:%s:%s:live', $this->getName(), $this->lang, md5($city));
 
         $cached = $this->getFromCache($cacheKey);
-        if ($cached !== null) {
+        if ($cached instanceof CurrentWeather) {
             return $cached;
         }
 
@@ -94,7 +94,7 @@ class Weather
         $cacheKey = sprintf('weather:%s:%s:%s:forecast', $this->getName(), $this->lang, md5($city));
 
         $cached = $this->getFromCache($cacheKey);
-        if ($cached !== null) {
+        if ($cached instanceof Forecast) {
             return $cached;
         }
 
