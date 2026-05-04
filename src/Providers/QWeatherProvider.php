@@ -26,11 +26,19 @@ class QWeatherProvider implements Provider
 
     protected ?Client $httpClient = null;
 
-    protected string $baseUri = 'https://devapi.qweather.com/v7';
+    protected string $baseUri;
+
+    /** @var array<string, string> */
+    protected array $locationCache = [];
 
     public function __construct(string $key)
     {
         $this->key = $key;
+        $host = getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
+        if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
+            $host = 'https://' . $host;
+        }
+        $this->baseUri = rtrim($host, '/') . '/v7';
     }
 
     public function getHttpClient(): Client
@@ -39,6 +47,7 @@ class QWeatherProvider implements Provider
             $this->httpClient = new Client(array_merge([
                 'timeout' => 10,
                 'connect_timeout' => 5,
+                'headers' => ['Connection' => 'close'],
             ], $this->guzzleOptions));
         }
 
@@ -103,7 +112,7 @@ class QWeatherProvider implements Provider
         foreach ($data['daily'] as $day) {
             $casts[] = new ForecastDay(
                 date: $day['fxDate'] ?? '',
-                week: $this->mapWeek($day['week'] ?? ''),
+                week: $this->mapWeek($day['week'] ?? $this->weekFromDate($day['fxDate'] ?? '')),
                 dayWeather: $day['textDay'] ?? '',
                 nightWeather: $day['textNight'] ?? '',
                 dayTemp: (float) ($day['tempMax'] ?? 0),
@@ -132,12 +141,13 @@ class QWeatherProvider implements Provider
 
         $url = $this->baseUri . '/indices/1d';
         $types = '1,2,3,5,6,8,9';
+        $location = $this->resolveCity($city);
 
         try {
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'key' => $this->key,
-                    'location' => $city,
+                    'location' => $location,
                     'type' => $types,
                 ],
             ])->getBody()->getContents();
@@ -172,12 +182,13 @@ class QWeatherProvider implements Provider
         }
 
         $url = $this->baseUri . '/air/now';
+        $location = $this->resolveCity($city);
 
         try {
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'key' => $this->key,
-                    'location' => $city,
+                    'location' => $location,
                 ],
             ])->getBody()->getContents();
 
@@ -215,12 +226,13 @@ class QWeatherProvider implements Provider
         }
 
         $url = $this->baseUri . '/warning/now';
+        $location = $this->resolveCity($city);
 
         try {
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'key' => $this->key,
-                    'location' => $city,
+                    'location' => $location,
                 ],
             ])->getBody()->getContents();
 
@@ -258,12 +270,13 @@ class QWeatherProvider implements Provider
         }
 
         $url = $this->baseUri . '/minutely/5m';
+        $location = $this->resolveCity($city);
 
         try {
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'key' => $this->key,
-                    'location' => $city,
+                    'location' => $location,
                 ],
             ])->getBody()->getContents();
 
@@ -300,12 +313,13 @@ class QWeatherProvider implements Provider
         }
 
         $url = $this->baseUri . $endpoint;
+        $location = $this->resolveCity($city);
 
         try {
             $response = $this->getHttpClient()->get($url, [
                 'query' => array_filter([
                     'key' => $this->key,
-                    'location' => $city,
+                    'location' => $location,
                 ]),
             ])->getBody()->getContents();
 
@@ -315,6 +329,42 @@ class QWeatherProvider implements Provider
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    protected function resolveCity(string $city): string
+    {
+        if (preg_match('/^\d+$/', $city)) {
+            return $city;
+        }
+
+        if (isset($this->locationCache[$city])) {
+            return $this->locationCache[$city];
+        }
+
+        try {
+            $host = getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
+            if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
+                $host = 'https://' . $host;
+            }
+            $url = rtrim($host, '/') . '/geo/v2/city/lookup';
+
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'location' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+            if (is_array($data) && ($data['code'] ?? '') === '200' && !empty($data['location'][0]['id'])) {
+                $this->locationCache[$city] = $data['location'][0]['id'];
+                return $this->locationCache[$city];
+            }
+        } catch (\Throwable $e) {
+            // fallback to original city name
+        }
+
+        return $city;
     }
 
     protected function mapWeek(string $week): string
@@ -330,5 +380,18 @@ class QWeatherProvider implements Provider
         ];
 
         return $map[$week] ?? $week;
+    }
+
+    protected function weekFromDate(string $date): string
+    {
+        if (empty($date)) {
+            return '';
+        }
+        $map = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        $timestamp = strtotime($date);
+        if ($timestamp === false) {
+            return '';
+        }
+        return $map[(int) date('w', $timestamp)];
     }
 }

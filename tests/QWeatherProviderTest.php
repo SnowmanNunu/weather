@@ -21,9 +21,10 @@ class QWeatherProviderTest extends TestCase
 {
     protected function mockClient(array $responseData): Client
     {
-        $response = new Response(200, [], json_encode($responseData));
         $client = \Mockery::mock(Client::class);
-        $client->allows()->get(\Mockery::any(), \Mockery::any())->andReturn($response);
+        $client->allows()->get(\Mockery::any(), \Mockery::any())->andReturnUsing(function () use ($responseData) {
+            return new Response(200, [], json_encode($responseData));
+        });
 
         return $client;
     }
