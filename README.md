@@ -156,6 +156,22 @@ composer check         # 全部检查
 | 和风天气 | `qweather` | 全球 | 1000 次/天 |
 | OpenWeatherMap | `openweathermap` | 全球 | 1000 次/天 |
 
+### 各 Provider API 支持对比
+
+| 接口 | 高德 AMap | 和风 QWeather | OpenWeatherMap |
+|---|---|---|---|
+| **实时天气** `getLiveWeather` | ✅ 支持 | ✅ 支持 | ✅ 支持 |
+| **天气预报** `getForecastsWeather` | ✅ 支持（3/7 天） | ✅ 支持（7 天） | ✅ 支持（5 天/3h） |
+| **生活指数** `getLifeIndices` | ✅ 支持（运动/洗车/穿衣等） | ✅ 支持 | ❌ 返回空数组 |
+| **空气质量** `getAirQuality` | ⚠️ 支持（部分 Key 无权限） | ⚠️ 支持（免费版 403） | ❌ 返回 null |
+| **天气预警** `getAlerts` | ❌ 不支持（返回 `[]`） | ⚠️ 支持（免费版 403） | ❌ 返回空数组 |
+| **分钟降水** `getMinutelyPrecipitation` | ❌ 不支持（返回 `[]`） | ⚠️ 支持（需经纬度） | ❌ 返回空数组 |
+
+> **说明**
+> - **高德**：生活指数和 AQI 取决于 Key 是否开通对应权限，SDK 已做容错（报错时返回空，不抛异常）
+> - **和风**：AQI 和预警接口免费开发版直接 403；分钟降水需传入经纬度坐标，传 LocationID 会报 400
+> - **OpenWeatherMap**：只覆盖了实时天气 + 预报，其余 feature 没有对应免费接口
+
 ---
 
 ## 📄 License
