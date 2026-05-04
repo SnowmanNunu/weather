@@ -142,6 +142,23 @@ class OpenWeatherMapProviderTest extends TestCase
         $this->assertCount(0, $indices);
     }
 
+    public function testGetAirQualityReturnsNull()
+    {
+        $provider = new OpenWeatherMapProvider('key');
+        $aqi = $provider->getAirQuality('Beijing');
+
+        $this->assertNull($aqi);
+    }
+
+    public function testGetAlertsReturnsEmpty()
+    {
+        $provider = new OpenWeatherMapProvider('key');
+        $alerts = $provider->getAlerts('Beijing');
+
+        $this->assertIsArray($alerts);
+        $this->assertCount(0, $alerts);
+    }
+
     public function testName()
     {
         $provider = new OpenWeatherMapProvider('key');

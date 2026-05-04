@@ -7,6 +7,7 @@ namespace SnowmanNunu\Weather\Tests;
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Psr7\Response;
+use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\LifeIndex;
@@ -188,6 +189,57 @@ class AMapProviderTest extends TestCase
 
         $this->assertIsArray($indices);
         $this->assertCount(0, $indices);
+    }
+
+    public function testGetAirQuality()
+    {
+        $client = $this->mockClient([
+            'status' => '1',
+            'city' => ['name' => '深圳市', 'code' => '440300'],
+            'aqi' => [
+                'aqi' => '45',
+                'level' => '1',
+                'category' => '优',
+                'primary' => '-',
+                'pm25' => '20',
+                'pm10' => '35',
+                'no2' => '30',
+                'so2' => '10',
+                'co' => '0.8',
+                'o3' => '50',
+                'pub_time' => '2024-01-01 14:00:00',
+            ],
+        ]);
+
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $aqi = $provider->getAirQuality('深圳');
+
+        $this->assertInstanceOf(AirQuality::class, $aqi);
+        $this->assertSame(45, $aqi->aqi);
+        $this->assertSame('优', $aqi->category);
+    }
+
+    public function testGetAirQualityReturnsNullOnError()
+    {
+        $client = $this->mockClient(['status' => '0', 'info' => 'SERVICE_NOT_AVAILABLE']);
+
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $aqi = $provider->getAirQuality('深圳');
+
+        $this->assertNull($aqi);
+    }
+
+    public function testGetAlertsReturnsEmpty()
+    {
+        $provider = new AMapProvider('mock-key');
+        $alerts = $provider->getAlerts('深圳');
+
+        $this->assertIsArray($alerts);
+        $this->assertCount(0, $alerts);
     }
 
     public function testGetWeatherWithGuzzleRuntimeException()

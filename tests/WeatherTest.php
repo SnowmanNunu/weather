@@ -159,6 +159,34 @@ class WeatherTest extends TestCase
         $this->assertSame('运动指数', $result[0]->name);
     }
 
+    public function testGetAirQualityDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $aqi = new \SnowmanNunu\Weather\DTO\AirQuality('北京市', 45, '1', '优');
+        $provider->expects()->getAirQuality('北京')->andReturn($aqi);
+
+        $w = new Weather($provider);
+        $result = $w->getAirQuality('北京');
+
+        $this->assertInstanceOf(\SnowmanNunu\Weather\DTO\AirQuality::class, $result);
+        $this->assertSame(45, $result->aqi);
+    }
+
+    public function testGetAlertsDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $alert = new \SnowmanNunu\Weather\DTO\WeatherAlert('暴雨预警', '暴雨', '黄色', '预计未来有强降水', '2024-01-01 10:00');
+        $provider->expects()->getAlerts('北京')->andReturn([$alert]);
+
+        $w = new Weather($provider);
+        $result = $w->getAlerts('北京');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('暴雨预警', $result[0]->title);
+    }
+
     public function testHttpClientThrowsForNonAMap()
     {
         $provider = new QWeatherProvider('key');

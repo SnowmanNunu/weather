@@ -32,6 +32,16 @@
 
     let html = '';
 
+    if (data.alerts && data.alerts.length > 0) {
+      data.alerts.forEach((alert) => {
+        html += `<div class="alert alert-danger">
+          <strong>${escapeHtml(alert.title)}</strong>
+          <p>${escapeHtml(alert.content)}</p>
+          <small>${escapeHtml(alert.pub_time)} · ${escapeHtml(alert.sender)}</small>
+        </div>`;
+      });
+    }
+
     html += `<div class="card current">
       <div class="current-main">
         <div class="city-name">${escapeHtml(current.city)}</div>
@@ -73,6 +83,29 @@
       html += '</div>';
     }
 
+    if (data.aqi) {
+      const aqi = data.aqi;
+      const aqiColor = getAqiColor(aqi.aqi);
+      html += `<div class="card aqi">
+        <div class="aqi-header">
+          <div class="aqi-value" style="color:${aqiColor}">${aqi.aqi != null ? aqi.aqi : '-'}</div>
+          <div class="aqi-meta">
+            <div class="aqi-category" style="color:${aqiColor}">${escapeHtml(aqi.category)}</div>
+            <div class="aqi-label">空气质量指数</div>
+          </div>
+        </div>
+        <div class="aqi-details">
+          <div class="aqi-item"><span class="aqi-dt">PM2.5</span><span class="aqi-dv">${aqi.pm25 != null ? aqi.pm25 : '-'}</span></div>
+          <div class="aqi-item"><span class="aqi-dt">PM10</span><span class="aqi-dv">${aqi.pm10 != null ? aqi.pm10 : '-'}</span></div>
+          <div class="aqi-item"><span class="aqi-dt">NO₂</span><span class="aqi-dv">${aqi.no2 != null ? aqi.no2 : '-'}</span></div>
+          <div class="aqi-item"><span class="aqi-dt">SO₂</span><span class="aqi-dv">${aqi.so2 != null ? aqi.so2 : '-'}</span></div>
+          <div class="aqi-item"><span class="aqi-dt">CO</span><span class="aqi-dv">${aqi.co != null ? aqi.co : '-'}</span></div>
+          <div class="aqi-item"><span class="aqi-dt">O₃</span><span class="aqi-dv">${aqi.o3 != null ? aqi.o3 : '-'}</span></div>
+        </div>
+        ${aqi.primary_pollutant ? `<div class="aqi-primary">首要污染物：${escapeHtml(aqi.primary_pollutant)}</div>` : ''}
+      </div>`;
+    }
+
     if (data.indices && data.indices.length > 0) {
       html += '<h2 class="section-title">生活指数</h2>';
       html += '<div class="indices-grid">';
@@ -93,6 +126,16 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function getAqiColor(aqi) {
+    if (aqi == null) return '#9ca3af';
+    if (aqi <= 50) return '#22c55e';
+    if (aqi <= 100) return '#eab308';
+    if (aqi <= 150) return '#f97316';
+    if (aqi <= 200) return '#ef4444';
+    if (aqi <= 300) return '#a855f7';
+    return '#7f1d1d';
   }
 
   async function fetchWeather(city) {

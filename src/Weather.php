@@ -6,6 +6,7 @@ namespace SnowmanNunu\Weather;
 
 use GuzzleHttp\Client;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
@@ -105,6 +106,59 @@ class Weather
         }
 
         $result = $this->provider->getLifeIndices($city);
+
+        try {
+            $this->cache?->set($cacheKey, $result, $this->cacheTtl);
+        } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+            // ignore
+        }
+
+        return $result;
+    }
+
+    public function getAirQuality(string $city): ?AirQuality
+    {
+        $cacheKey = sprintf('weather:%s:%s:aqi', $this->getName(), md5($city));
+
+        try {
+            $cached = $this->cache?->get($cacheKey);
+            if ($cached instanceof AirQuality) {
+                return $cached;
+            }
+        } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+            // ignore
+        }
+
+        $result = $this->provider->getAirQuality($city);
+
+        if ($result instanceof AirQuality) {
+            try {
+                $this->cache?->set($cacheKey, $result, $this->cacheTtl);
+            } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+                // ignore
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return \SnowmanNunu\Weather\DTO\WeatherAlert[]
+     */
+    public function getAlerts(string $city): array
+    {
+        $cacheKey = sprintf('weather:%s:%s:alerts', $this->getName(), md5($city));
+
+        try {
+            $cached = $this->cache?->get($cacheKey);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        } catch (\Psr\SimpleCache\InvalidArgumentException $e) {
+            // ignore
+        }
+
+        $result = $this->provider->getAlerts($city);
 
         try {
             $this->cache?->set($cacheKey, $result, $this->cacheTtl);

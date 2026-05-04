@@ -38,6 +38,8 @@ try {
     $current = $weather->getLiveWeather($city);
     $forecast = $weather->getForecastsWeather($city);
     $indices = $weather->getLifeIndices($city);
+    $aqi = $weather->getAirQuality($city);
+    $alerts = $weather->getAlerts($city);
 
     echo json_encode([
         'success' => true,
@@ -45,6 +47,8 @@ try {
         'current' => $current->toArray(),
         'forecast' => $forecast->toArray(),
         'indices' => array_map(static fn ($i) => $i->toArray(), $indices),
+        'aqi' => $aqi ? $aqi->toArray() : null,
+        'alerts' => array_map(static fn ($a) => $a->toArray(), $alerts),
     ], JSON_UNESCAPED_UNICODE);
 } catch (\Throwable $e) {
     http_response_code(500);

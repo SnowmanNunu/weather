@@ -7,10 +7,12 @@ namespace SnowmanNunu\Weather\Providers;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -186,6 +188,54 @@ class AMapProvider implements Provider
         } catch (TransferException $e) {
             return [];
         }
+    }
+
+    public function getAirQuality(string $city): ?AirQuality
+    {
+        $url = 'https://restapi.amap.com/v3/air/quality';
+
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'city' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['status'] ?? '0') !== '1') {
+                return null;
+            }
+
+            $aqi = $data['aqi'] ?? [];
+
+            return new AirQuality(
+                city: $data['city']['name'] ?? $city,
+                aqi: isset($aqi['aqi']) ? (int) $aqi['aqi'] : null,
+                level: $aqi['level'] ?? null,
+                category: $aqi['category'] ?? null,
+                primaryPollutant: $aqi['primary'] ?? null,
+                pm25: isset($aqi['pm25']) ? (float) $aqi['pm25'] : null,
+                pm10: isset($aqi['pm10']) ? (float) $aqi['pm10'] : null,
+                no2: isset($aqi['no2']) ? (float) $aqi['no2'] : null,
+                so2: isset($aqi['so2']) ? (float) $aqi['so2'] : null,
+                co: isset($aqi['co']) ? (float) $aqi['co'] : null,
+                o3: isset($aqi['o3']) ? (float) $aqi['o3'] : null,
+                updateTime: $aqi['pub_time'] ?? null,
+            );
+        } catch (TransferException $e) {
+            return null;
+        }
+    }
+
+    public function getAlerts(string $city): array
+    {
+        return [];
     }
 
     protected function mapWeek(string $week): string

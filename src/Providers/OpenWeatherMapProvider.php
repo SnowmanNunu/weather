@@ -7,10 +7,12 @@ namespace SnowmanNunu\Weather\Providers;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -76,6 +78,16 @@ class OpenWeatherMapProvider implements Provider
     }
 
     public function getLifeIndices(string $city): array
+    {
+        return [];
+    }
+
+    public function getAirQuality(string $city): ?AirQuality
+    {
+        return null;
+    }
+
+    public function getAlerts(string $city): array
     {
         return [];
     }

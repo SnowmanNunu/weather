@@ -7,10 +7,12 @@ namespace SnowmanNunu\Weather\Providers;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
 use SnowmanNunu\Weather\Contracts\Provider;
+use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
 
@@ -157,6 +159,92 @@ class QWeatherProvider implements Provider
             }
 
             return $indices;
+        } catch (TransferException $e) {
+            return [];
+        }
+    }
+
+    public function getAirQuality(string $city): ?AirQuality
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri . '/air/now';
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'location' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                return null;
+            }
+
+            $now = $data['now'] ?? [];
+
+            return new AirQuality(
+                city: $city,
+                aqi: isset($now['aqi']) ? (int) $now['aqi'] : null,
+                level: $now['level'] ?? null,
+                category: $now['category'] ?? null,
+                primaryPollutant: $now['primary'] ?? null,
+                pm25: isset($now['pm2p5']) ? (float) $now['pm2p5'] : null,
+                pm10: isset($now['pm10']) ? (float) $now['pm10'] : null,
+                no2: isset($now['no2']) ? (float) $now['no2'] : null,
+                so2: isset($now['so2']) ? (float) $now['so2'] : null,
+                co: isset($now['co']) ? (float) $now['co'] : null,
+                o3: isset($now['o3']) ? (float) $now['o3'] : null,
+                updateTime: $now['pubTime'] ?? null,
+            );
+        } catch (TransferException $e) {
+            return null;
+        }
+    }
+
+    public function getAlerts(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri . '/warning/now';
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'location' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                return [];
+            }
+
+            $alerts = [];
+            foreach ($data['warning'] ?? [] as $item) {
+                $alerts[] = new WeatherAlert(
+                    title: $item['title'] ?? '',
+                    type: $item['typeName'] ?? '',
+                    level: $item['level'] ?? '',
+                    content: $item['text'] ?? '',
+                    pubTime: $item['pubTime'] ?? '',
+                    status: $item['status'] ?? 'active',
+                    sender: $item['sender'] ?? '',
+                    startTime: $item['startTime'] ?? '',
+                    endTime: $item['endTime'] ?? '',
+                );
+            }
+
+            return $alerts;
         } catch (TransferException $e) {
             return [];
         }
