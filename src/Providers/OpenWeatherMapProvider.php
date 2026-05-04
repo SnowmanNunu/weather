@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -217,7 +218,7 @@ class OpenWeatherMapProvider implements Provider
 
             return is_array($decoded) ? $decoded : [];
         } catch (TransferException $e) {
-            if ($e instanceof \GuzzleHttp\Exception\ClientException && $e->getResponse()) {
+            if ($e instanceof ClientException && $e->getResponse()) {
                 $status = $e->getResponse()->getStatusCode();
                 $message = 'OpenWeatherMap API error: HTTP ' . $status;
                 if ($status === 401) {
