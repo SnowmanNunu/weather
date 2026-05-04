@@ -421,7 +421,10 @@ class QWeatherProvider implements Provider
                     },
                     fn () => null,
                 ),
-            'indices' => $client->getAsync($this->baseUri . '/indices/1d', ['query' => array_merge($baseQuery, ['type' => '1,2,3,5,6,8,9'])])
+            'indices' => $client->getAsync(
+                $this->baseUri . '/indices/1d',
+                ['query' => array_merge($baseQuery, ['type' => '1,2,3,5,6,8,9'])]
+            )
                 ->then(
                     function ($response) {
                         try {

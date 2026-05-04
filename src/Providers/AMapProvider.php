@@ -323,7 +323,10 @@ class AMapProvider implements Provider
         $baseQuery = ['key' => $this->key, 'city' => $city];
 
         $promises = [
-            'current' => $client->getAsync('https://restapi.amap.com/v3/weather/weatherInfo', ['query' => array_merge($baseQuery, ['extensions' => 'base'])])
+            'current' => $client->getAsync(
+                'https://restapi.amap.com/v3/weather/weatherInfo',
+                ['query' => array_merge($baseQuery, ['extensions' => 'base'])]
+            )
                 ->then(
                     function ($response) use ($city) {
                         try {
@@ -349,7 +352,10 @@ class AMapProvider implements Provider
                     },
                     fn () => null,
                 ),
-            'forecast' => $client->getAsync('https://restapi.amap.com/v3/weather/weatherInfo', ['query' => array_merge($baseQuery, ['extensions' => 'all'])])
+            'forecast' => $client->getAsync(
+                'https://restapi.amap.com/v3/weather/weatherInfo',
+                ['query' => array_merge($baseQuery, ['extensions' => 'all'])]
+            )
                 ->then(
                     function ($response) use ($city) {
                         try {
