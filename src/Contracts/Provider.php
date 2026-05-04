@@ -8,6 +8,7 @@ use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\Precipitation;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 
 interface Provider
@@ -61,6 +62,16 @@ interface Provider
      * @throws \SnowmanNunu\Weather\Exceptions\InvalidArgumentException
      */
     public function getAlerts(string $city): array;
+
+    /**
+     * Get minutely precipitation forecast for a city.
+     *
+     * @param string $city City name or adcode
+     * @return Precipitation[]
+     * @throws \SnowmanNunu\Weather\Exceptions\HttpException
+     * @throws \SnowmanNunu\Weather\Exceptions\InvalidArgumentException
+     */
+    public function getMinutelyPrecipitation(string $city): array;
 
     /**
      * Provider name identifier.

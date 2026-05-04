@@ -159,6 +159,15 @@ class OpenWeatherMapProviderTest extends TestCase
         $this->assertCount(0, $alerts);
     }
 
+    public function testGetMinutelyPrecipitationReturnsEmpty()
+    {
+        $provider = new OpenWeatherMapProvider('key');
+        $items = $provider->getMinutelyPrecipitation('Beijing');
+
+        $this->assertIsArray($items);
+        $this->assertCount(0, $items);
+    }
+
     public function testName()
     {
         $provider = new OpenWeatherMapProvider('key');

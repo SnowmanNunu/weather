@@ -68,6 +68,23 @@
       </div>
     </div>`;
 
+    if (data.minutely && data.minutely.length > 0) {
+      html += '<h2 class="section-title">分钟级降水预报</h2>';
+      html += '<div class="card minutely">';
+      html += '<div class="minutely-chart">';
+      const maxPrecip = Math.max(...data.minutely.map((m) => m.precipitation), 0.1);
+      data.minutely.forEach((m, i) => {
+        const heightPct = Math.min((m.precipitation / maxPrecip) * 100, 100);
+        const barColor = m.precipitation > 0.5 ? '#3b82f6' : '#93c5fd';
+        const timeLabel = m.time ? m.time.slice(11, 16) : '';
+        html += `<div class="minutely-bar-wrap" title="${timeLabel} ${m.precipitation}mm">
+          <div class="minutely-bar" style="height:${heightPct}%;background:${barColor}"></div>
+          ${i % 10 === 0 ? `<div class="minutely-time">${timeLabel}</div>` : ''}
+        </div>`;
+      });
+      html += '</div></div>';
+    }
+
     if (forecast && forecast.casts && forecast.casts.length > 0) {
       html += '<h2 class="section-title">未来预报</h2>';
       html += '<div class="forecast-grid">';

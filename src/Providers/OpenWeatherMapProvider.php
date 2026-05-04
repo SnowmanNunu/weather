@@ -92,6 +92,11 @@ class OpenWeatherMapProvider implements Provider
         return [];
     }
 
+    public function getMinutelyPrecipitation(string $city): array
+    {
+        return [];
+    }
+
     /**
      * @return array<string, mixed>
      * @throws HttpException

@@ -187,6 +187,20 @@ class WeatherTest extends TestCase
         $this->assertSame('暴雨预警', $result[0]->title);
     }
 
+    public function testGetMinutelyPrecipitationDelegates()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $item = new \SnowmanNunu\Weather\DTO\Precipitation('2024-01-01T14:00+08:00', 'rain', 0.5);
+        $provider->expects()->getMinutelyPrecipitation('北京')->andReturn([$item]);
+
+        $w = new Weather($provider);
+        $result = $w->getMinutelyPrecipitation('北京');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('2024-01-01T14:00+08:00', $result[0]->time);
+    }
+
     public function testHttpClientThrowsForNonAMap()
     {
         $provider = new QWeatherProvider('key');

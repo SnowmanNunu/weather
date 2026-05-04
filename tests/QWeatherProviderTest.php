@@ -10,6 +10,7 @@ use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\Precipitation;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
@@ -247,6 +248,48 @@ class QWeatherProviderTest extends TestCase
 
         $this->assertIsArray($alerts);
         $this->assertCount(0, $alerts);
+    }
+
+    public function testGetMinutelyPrecipitation()
+    {
+        $client = $this->mockClient([
+            'code' => '200',
+            'minutely' => [
+                [
+                    'fxTime' => '2024-01-01T14:00+08:00',
+                    'type' => 'rain',
+                    'precip' => '0.5',
+                ],
+                [
+                    'fxTime' => '2024-01-01T14:05+08:00',
+                    'type' => 'rain',
+                    'precip' => '1.2',
+                ],
+            ],
+        ]);
+
+        $provider = new QWeatherProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $items = $provider->getMinutelyPrecipitation('深圳');
+
+        $this->assertCount(2, $items);
+        $this->assertInstanceOf(Precipitation::class, $items[0]);
+        $this->assertSame('2024-01-01T14:00+08:00', $items[0]->time);
+        $this->assertSame(0.5, $items[0]->precipitation);
+    }
+
+    public function testGetMinutelyPrecipitationReturnsEmptyOnError()
+    {
+        $client = $this->mockClient(['code' => '404', 'minutely' => []]);
+
+        $provider = new QWeatherProvider('mock-key');
+        $provider->setHttpClient($client);
+
+        $items = $provider->getMinutelyPrecipitation('深圳');
+
+        $this->assertIsArray($items);
+        $this->assertCount(0, $items);
     }
 
     public function testName()

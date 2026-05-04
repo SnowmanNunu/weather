@@ -238,6 +238,11 @@ class AMapProvider implements Provider
         return [];
     }
 
+    public function getMinutelyPrecipitation(string $city): array
+    {
+        return [];
+    }
+
     protected function mapWeek(string $week): string
     {
         $map = [

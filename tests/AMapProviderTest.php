@@ -242,6 +242,15 @@ class AMapProviderTest extends TestCase
         $this->assertCount(0, $alerts);
     }
 
+    public function testGetMinutelyPrecipitationReturnsEmpty()
+    {
+        $provider = new AMapProvider('mock-key');
+        $items = $provider->getMinutelyPrecipitation('深圳');
+
+        $this->assertIsArray($items);
+        $this->assertCount(0, $items);
+    }
+
     public function testGetWeatherWithGuzzleRuntimeException()
     {
         $request = new \GuzzleHttp\Psr7\Request('GET', 'test');

@@ -355,6 +355,44 @@ header h1 {
     margin-top: 4px;
 }
 
+.minutely-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 120px;
+    padding-bottom: 24px;
+    overflow-x: auto;
+}
+
+.minutely-bar-wrap {
+    flex: 1;
+    min-width: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+}
+
+.minutely-bar {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    transition: opacity 0.2s;
+    min-height: 2px;
+}
+
+.minutely-bar-wrap:hover .minutely-bar {
+    opacity: 0.8;
+}
+
+.minutely-time {
+    position: absolute;
+    bottom: -22px;
+    font-size: 0.7rem;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
 footer {
     text-align: center;
     padding: 30px 0;
@@ -390,5 +428,9 @@ footer a {
 
     .aqi-details {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .minutely-chart {
+        height: 100px;
     }
 }

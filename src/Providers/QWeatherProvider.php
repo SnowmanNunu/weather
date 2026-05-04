@@ -12,6 +12,7 @@ use SnowmanNunu\Weather\DTO\CurrentWeather;
 use SnowmanNunu\Weather\DTO\Forecast;
 use SnowmanNunu\Weather\DTO\ForecastDay;
 use SnowmanNunu\Weather\DTO\LifeIndex;
+use SnowmanNunu\Weather\DTO\Precipitation;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
@@ -245,6 +246,43 @@ class QWeatherProvider implements Provider
             }
 
             return $alerts;
+        } catch (TransferException $e) {
+            return [];
+        }
+    }
+
+    public function getMinutelyPrecipitation(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri . '/minutely/5m';
+
+        try {
+            $response = $this->getHttpClient()->get($url, [
+                'query' => [
+                    'key' => $this->key,
+                    'location' => $city,
+                ],
+            ])->getBody()->getContents();
+
+            $data = json_decode($response, true);
+
+            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                return [];
+            }
+
+            $items = [];
+            foreach ($data['minutely'] ?? [] as $item) {
+                $items[] = new Precipitation(
+                    time: $item['fxTime'] ?? '',
+                    type: $item['type'] ?? '',
+                    precipitation: isset($item['precip']) ? (float) $item['precip'] : 0.0,
+                );
+            }
+
+            return $items;
         } catch (TransferException $e) {
             return [];
         }
