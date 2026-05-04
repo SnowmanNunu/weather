@@ -11,5 +11,4 @@ phpunit.php        export-ignore
 phpstan.neon       export-ignore
 Dockerfile         export-ignore
 docker-compose.yml export-ignore
-CHANGELOG.md       export-ignore
-CONTRIBUTING.md    export-ignore
+# CHANGELOG.md and CONTRIBUTING.md are kept in the package for user reference

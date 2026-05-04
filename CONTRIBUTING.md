@@ -14,7 +14,7 @@
 
 - PHP 8.0+
 - PSR-12 代码风格
-- PHPStan Level 5 零错误
+- PHPStan Level 8 零错误
 - PHPUnit 测试覆盖新功能
 
 ## 提交信息规范
