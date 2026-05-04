@@ -16,7 +16,8 @@
 - **标准化响应**：统一 `CurrentWeather` / `Forecast` DTO，无需适配各平台差异
 - **PSR-16 缓存**：支持 Redis / File / Array 等缓存驱动，减少 API 调用
 - **Laravel 集成**：ServiceProvider + Facade 开箱即用
-- **Web 演示**：内置 SPA 天气查询页面，支持 IP 自动定位
+- **Web 演示**：内置 SPA 天气查询页面，支持 IP 自动定位与中英文切换
+- **多语言 i18n**：SDK 与演示站点均支持 `zh` / `en`，通过环境变量或 URL 参数切换
 - **代码质量**：PHPUnit + PHPStan Level 5 + PHPCS PSR-12，CI 全自动检查
 
 ---
@@ -109,8 +110,15 @@ app('weather')->getLiveWeather('上海');
 
 ```bash
 cp public/.env.example public/.env
-# 编辑 .env 填入 WEATHER_KEY 和 WEATHER_PROVIDER
+# 编辑 .env 填入 WEATHER_KEY、WEATHER_PROVIDER 和可选的 WEATHER_LANG
 ```
+
+| 环境变量 | 说明 | 默认值 |
+|---|---|---|
+| `WEATHER_KEY` | Provider API Key | 必填 |
+| `WEATHER_PROVIDER` | 数据源：`amap` / `qweather` / `openweathermap` | `amap` |
+| `WEATHER_LANG` | 语言：`zh` / `en` | `zh` |
+| `QWEATHER_API_HOST` | 和风天气专属 API Host（含 https://） | `https://devapi.qweather.com` |
 
 Nginx 配置示例：
 
