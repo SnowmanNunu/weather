@@ -6,6 +6,7 @@ namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
@@ -108,6 +109,56 @@ class OpenWeatherMapProvider implements Provider
     public function getMinutelyPrecipitation(string $city): array
     {
         return [];
+    }
+
+    public function fetchAll(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri;
+        $lang = $this->lang === 'zh' ? 'zh_cn' : ($this->lang ?: 'zh_cn');
+        $query = [
+            'q' => $city,
+            'appid' => $this->key,
+            'units' => 'metric',
+            'lang' => $lang,
+        ];
+        $client = $this->getHttpClient();
+
+        $promises = [
+            'current' => $client->getAsync($url . '/weather', ['query' => $query])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            return $this->normalizeCurrent(is_array($data) ? $data : []);
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'forecast' => $client->getAsync($url . '/forecast', ['query' => $query])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            return $this->normalizeForecast(is_array($data) ? $data : []);
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'indices' => \GuzzleHttp\Promise\Create::promiseFor([]),
+            'aqi' => \GuzzleHttp\Promise\Create::promiseFor(null),
+            'alerts' => \GuzzleHttp\Promise\Create::promiseFor([]),
+            'minutely' => \GuzzleHttp\Promise\Create::promiseFor([]),
+        ];
+
+        return Utils::unwrap($promises);
     }
 
     /**

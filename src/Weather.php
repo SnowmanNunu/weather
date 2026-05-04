@@ -212,6 +212,29 @@ class Weather
     }
 
     /**
+     * Fetch all weather data concurrently.
+     *
+     * @return array<string, mixed> Keys: current, forecast, indices, aqi, alerts, minutely
+     */
+    public function getAll(string $city): array
+    {
+        $results = $this->provider->fetchAll($city);
+
+        if ($this->cache !== null) {
+            $prefix = sprintf('weather:%s:%s:%s', $this->getName(), $this->lang, md5($city));
+
+            if (isset($results['current']) && $results['current'] instanceof CurrentWeather) {
+                $this->setToCache($prefix . ':live', $results['current']);
+            }
+            if (isset($results['forecast']) && $results['forecast'] instanceof Forecast) {
+                $this->setToCache($prefix . ':forecast', $results['forecast']);
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Backward compatibility. Returns raw array representation.
      *
      * @return array<string, mixed>

@@ -220,4 +220,28 @@ class WeatherTest extends TestCase
         $this->expectException(\BadMethodCallException::class);
         $w->getHttpClient();
     }
+
+    public function testGetAllDelegatesToProvider()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->allows()->setLang(\Mockery::any());
+
+        $current = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
+        $forecast = new Forecast('深圳市', '440300', []);
+        $provider->expects()->fetchAll('深圳')->once()->andReturn([
+            'current' => $current,
+            'forecast' => $forecast,
+            'indices' => [],
+            'aqi' => null,
+            'alerts' => [],
+            'minutely' => [],
+        ]);
+
+        $w = new Weather($provider);
+        $result = $w->getAll('深圳');
+
+        $this->assertSame($current, $result['current']);
+        $this->assertSame($forecast, $result['forecast']);
+    }
 }

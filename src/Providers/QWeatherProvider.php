@@ -6,6 +6,7 @@ namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
@@ -312,6 +313,199 @@ class QWeatherProvider implements Provider
         } catch (TransferException $e) {
             return [];
         }
+    }
+
+    public function fetchAll(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $location = $this->resolveCity($city);
+        $baseQuery = $this->withLang(['key' => $this->key, 'location' => $location]);
+        $client = $this->getHttpClient();
+
+        $promises = [
+            'current' => $client->getAsync($this->baseUri . '/weather/now', ['query' => $baseQuery])
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (($data['code'] ?? '') !== '200' || empty($data['now'])) {
+                                return null;
+                            }
+                            $now = $data['now'];
+
+                            return new CurrentWeather(
+                                city: $city,
+                                adcode: $data['location']['id'] ?? '',
+                                temperature: (float) ($now['temp'] ?? 0),
+                                weather: $now['text'] ?? '',
+                                windDirection: $now['windDir'] ?? '',
+                                windPower: $now['windScale'] ?? '',
+                                humidity: isset($now['humidity']) ? (int) $now['humidity'] : null,
+                                pressure: isset($now['pressure']) ? (int) $now['pressure'] : null,
+                                visibility: $now['vis'] ?? null,
+                                feelsLike: isset($now['feelsLike']) ? (float) $now['feelsLike'] : null,
+                                updateTime: $now['obsTime'] ?? '',
+                                icon: $now['icon'] ?? '',
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'forecast' => $client->getAsync($this->baseUri . '/weather/7d', ['query' => $baseQuery])
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (($data['code'] ?? '') !== '200' || empty($data['daily'])) {
+                                return null;
+                            }
+                            $casts = [];
+                            foreach ($data['daily'] as $day) {
+                                $casts[] = new ForecastDay(
+                                    date: $day['fxDate'] ?? '',
+                                    week: $this->mapWeek($day['week'] ?? $this->weekFromDate($day['fxDate'] ?? '')),
+                                    dayWeather: $day['textDay'] ?? '',
+                                    nightWeather: $day['textNight'] ?? '',
+                                    dayTemp: (float) ($day['tempMax'] ?? 0),
+                                    nightTemp: (float) ($day['tempMin'] ?? 0),
+                                    dayWind: $day['windDirDay'] ?? '',
+                                    nightWind: $day['windDirNight'] ?? '',
+                                    dayPower: $day['windScaleDay'] ?? '',
+                                    nightPower: $day['windScaleNight'] ?? '',
+                                    iconDay: $day['iconDay'] ?? '',
+                                    iconNight: $day['iconNight'] ?? '',
+                                );
+                            }
+
+                            return new Forecast(
+                                city: $city,
+                                adcode: $data['location']['id'] ?? '',
+                                casts: $casts,
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'indices' => $client->getAsync($this->baseUri . '/indices/1d', ['query' => array_merge($baseQuery, ['type' => '1,2,3,5,6,8,9'])])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                                return [];
+                            }
+                            $indices = [];
+                            foreach ($data['daily'] ?? [] as $item) {
+                                $indices[] = new LifeIndex(
+                                    name: $item['name'] ?? '',
+                                    level: $item['level'] ?? '',
+                                    category: $item['category'] ?? '',
+                                    advice: $item['text'] ?? '',
+                                    type: $item['type'] ?? '',
+                                );
+                            }
+
+                            return $indices;
+                        } catch (\Throwable $e) {
+                            return [];
+                        }
+                    },
+                    fn () => [],
+                ),
+            'aqi' => $client->getAsync($this->baseUri . '/air/now', ['query' => $baseQuery])
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                                return null;
+                            }
+                            $now = $data['now'] ?? [];
+
+                            return new AirQuality(
+                                city: $city,
+                                aqi: isset($now['aqi']) ? (int) $now['aqi'] : null,
+                                level: $now['level'] ?? null,
+                                category: $now['category'] ?? null,
+                                primaryPollutant: $now['primary'] ?? null,
+                                pm25: isset($now['pm2p5']) ? (float) $now['pm2p5'] : null,
+                                pm10: isset($now['pm10']) ? (float) $now['pm10'] : null,
+                                no2: isset($now['no2']) ? (float) $now['no2'] : null,
+                                so2: isset($now['so2']) ? (float) $now['so2'] : null,
+                                co: isset($now['co']) ? (float) $now['co'] : null,
+                                o3: isset($now['o3']) ? (float) $now['o3'] : null,
+                                updateTime: $now['pubTime'] ?? null,
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'alerts' => $client->getAsync($this->baseUri . '/warning/now', ['query' => $baseQuery])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                                return [];
+                            }
+                            $alerts = [];
+                            foreach ($data['warning'] ?? [] as $item) {
+                                $alerts[] = new WeatherAlert(
+                                    title: $item['title'] ?? '',
+                                    type: $item['typeName'] ?? '',
+                                    level: $item['level'] ?? '',
+                                    content: $item['text'] ?? '',
+                                    pubTime: $item['pubTime'] ?? '',
+                                    status: $item['status'] ?? 'active',
+                                    sender: $item['sender'] ?? '',
+                                    startTime: $item['startTime'] ?? '',
+                                    endTime: $item['endTime'] ?? '',
+                                );
+                            }
+
+                            return $alerts;
+                        } catch (\Throwable $e) {
+                            return [];
+                        }
+                    },
+                    fn () => [],
+                ),
+            'minutely' => $client->getAsync($this->baseUri . '/minutely/5m', ['query' => $baseQuery])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['code'] ?? '') !== '200') {
+                                return [];
+                            }
+                            $items = [];
+                            foreach ($data['minutely'] ?? [] as $item) {
+                                $items[] = new Precipitation(
+                                    time: $item['fxTime'] ?? '',
+                                    type: $item['type'] ?? '',
+                                    precipitation: isset($item['precip']) ? (float) $item['precip'] : 0.0,
+                                );
+                            }
+
+                            return $items;
+                        } catch (\Throwable $e) {
+                            return [];
+                        }
+                    },
+                    fn () => [],
+                ),
+        ];
+
+        return Utils::unwrap($promises);
     }
 
     /**
