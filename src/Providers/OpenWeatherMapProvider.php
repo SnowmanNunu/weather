@@ -27,9 +27,12 @@ class OpenWeatherMapProvider implements Provider
 
     protected string $baseUri = 'https://api.openweathermap.org/data/2.5';
 
+    protected ?string $lang = null;
+
     public function __construct(string $key)
     {
         $this->key = $key;
+        $this->lang = getenv('WEATHER_LANG') ?: null;
     }
 
     public function getHttpClient(): Client
@@ -111,12 +114,13 @@ class OpenWeatherMapProvider implements Provider
         $url = $this->baseUri . $endpoint;
 
         try {
+            $lang = $this->lang === 'zh' ? 'zh_cn' : ($this->lang ?: 'zh_cn');
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'q' => $city,
                     'appid' => $this->key,
                     'units' => 'metric',
-                    'lang' => 'zh_cn',
+                    'lang' => $lang,
                 ],
             ])->getBody()->getContents();
 

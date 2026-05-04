@@ -13,6 +13,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 $providerName = getenv('WEATHER_PROVIDER') ?: 'amap';
 $city = $_GET['city'] ?? '';
+$lang = $_GET['lang'] ?? 'zh';
+putenv('WEATHER_LANG=' . $lang);
 
 $key = match ($providerName) {
     'qweather' => getenv('QWEATHER_KEY') ?: getenv('WEATHER_KEY') ?: '',

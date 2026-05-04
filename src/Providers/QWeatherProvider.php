@@ -28,12 +28,15 @@ class QWeatherProvider implements Provider
 
     protected string $baseUri;
 
+    protected ?string $lang = null;
+
     /** @var array<string, string> */
     protected array $locationCache = [];
 
     public function __construct(string $key)
     {
         $this->key = $key;
+        $this->lang = getenv('WEATHER_LANG') ?: null;
         $host = getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
         if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
             $host = 'https://' . $host;
@@ -145,11 +148,11 @@ class QWeatherProvider implements Provider
 
         try {
             $response = $this->getHttpClient()->get($url, [
-                'query' => [
+                'query' => $this->withLang([
                     'key' => $this->key,
                     'location' => $location,
                     'type' => $types,
-                ],
+                ]),
             ])->getBody()->getContents();
 
             $data = json_decode($response, true);
@@ -186,10 +189,10 @@ class QWeatherProvider implements Provider
 
         try {
             $response = $this->getHttpClient()->get($url, [
-                'query' => [
+                'query' => $this->withLang([
                     'key' => $this->key,
                     'location' => $location,
-                ],
+                ]),
             ])->getBody()->getContents();
 
             $data = json_decode($response, true);
@@ -230,10 +233,10 @@ class QWeatherProvider implements Provider
 
         try {
             $response = $this->getHttpClient()->get($url, [
-                'query' => [
+                'query' => $this->withLang([
                     'key' => $this->key,
                     'location' => $location,
-                ],
+                ]),
             ])->getBody()->getContents();
 
             $data = json_decode($response, true);
@@ -274,10 +277,10 @@ class QWeatherProvider implements Provider
 
         try {
             $response = $this->getHttpClient()->get($url, [
-                'query' => [
+                'query' => $this->withLang([
                     'key' => $this->key,
                     'location' => $location,
-                ],
+                ]),
             ])->getBody()->getContents();
 
             $data = json_decode($response, true);
@@ -320,6 +323,7 @@ class QWeatherProvider implements Provider
                 'query' => array_filter([
                     'key' => $this->key,
                     'location' => $location,
+                    'lang' => $this->lang,
                 ]),
             ])->getBody()->getContents();
 
@@ -329,6 +333,14 @@ class QWeatherProvider implements Provider
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    protected function withLang(array $query): array
+    {
+        if ($this->lang !== null && $this->lang !== '') {
+            $query['lang'] = $this->lang;
+        }
+        return $query;
     }
 
     protected function resolveCity(string $city): string
@@ -349,10 +361,10 @@ class QWeatherProvider implements Provider
             $url = rtrim($host, '/') . '/geo/v2/city/lookup';
 
             $response = $this->getHttpClient()->get($url, [
-                'query' => [
+                'query' => $this->withLang([
                     'key' => $this->key,
                     'location' => $city,
-                ],
+                ]),
             ])->getBody()->getContents();
 
             $data = json_decode($response, true);
@@ -387,11 +399,14 @@ class QWeatherProvider implements Provider
         if (empty($date)) {
             return '';
         }
-        $map = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         $timestamp = strtotime($date);
         if ($timestamp === false) {
             return '';
         }
+        if ($this->lang === 'en') {
+            return date('D', $timestamp);
+        }
+        $map = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         return $map[(int) date('w', $timestamp)];
     }
 }
