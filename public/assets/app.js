@@ -75,7 +75,7 @@
         html += `<div class="card forecast">
           <div class="forecast-date">${escapeHtml(cast.date)}</div>
           <div class="forecast-day">${escapeHtml(cast.week)}</div>
-          <div class="forecast-weather">☀ ${escapeHtml(cast.day_weather)}</div>
+          <div class="forecast-weather">${getWeatherIcon(cast.day_weather)} ${escapeHtml(cast.day_weather)}</div>
           <div class="forecast-temp">${cast.day_temp}° / ${cast.night_temp}°</div>
           <div class="forecast-wind">${escapeHtml(cast.day_wind)}风 ${escapeHtml(cast.day_power)}</div>
         </div>`;
@@ -136,6 +136,22 @@
     if (aqi <= 200) return '#ef4444';
     if (aqi <= 300) return '#a855f7';
     return '#7f1d1d';
+  }
+
+  function getWeatherIcon(text) {
+    if (!text) return '☀️';
+    const t = text.trim();
+    if (t.includes('晴')) return '☀️';
+    if (t.includes('多云')) return '⛅';
+    if (t.includes('阴')) return '☁️';
+    if (t.includes('雷阵雨')) return '⛈️';
+    if (t.includes('暴雨') || t.includes('大暴雨')) return '🌧️';
+    if (t.includes('雨')) return '🌧️';
+    if (t.includes('雪')) return '❄️';
+    if (t.includes('雾') || t.includes('霾')) return '🌫️';
+    if (t.includes('风') || t.includes('沙')) return '💨';
+    if (t.includes('冰雹')) return '🧊';
+    return '☀️';
   }
 
   async function fetchWeather(city) {
