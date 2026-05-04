@@ -1,5 +1,20 @@
 # Changelog
 
+## [v1.8.0] - 2026-05-04
+
+### Added
+- 多语言 i18n 支持（`zh` / `en`），SDK 与演示站点均可切换
+- `Weather::setLang()` 链式方法，Provider 自动透传语言参数到上游 API
+- `Provider::fetchAll()` + `Weather::getAll()` 并发批量查询，6 个接口并行发送
+- Guzzle 自动重试中间件（网络超时 / 5xx / 429 指数退避，最多 2 次）
+- 精细化异常体系：`InvalidKeyException`、`RateLimitException`
+- GitHub Issue / PR 模板、Dependabot 自动依赖更新
+
+### Changed
+- PHPStan 从 Level 5 提升至 Level 8
+- `.gitattributes` 优化 Composer 包体积（排除 CI / Docker / 测试）
+- `public/.env.example` 补充 `WEATHER_LANG` 和 `QWEATHER_API_HOST`
+
 ## [v1.6.0] - 2026-05-04
 
 ### Added
