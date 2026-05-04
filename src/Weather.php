@@ -20,6 +20,8 @@ class Weather
 
     protected int $cacheTtl = 300;
 
+    protected string $lang = 'zh';
+
     /**
      * @param string|Provider $keyOrProvider API key string or a Provider instance
      */
@@ -59,9 +61,22 @@ class Weather
         return $this->provider->getName();
     }
 
+    public function setLang(string $lang): self
+    {
+        $this->lang = $lang;
+        $this->provider->setLang($lang);
+
+        return $this;
+    }
+
+    public function getLang(): string
+    {
+        return $this->lang;
+    }
+
     public function getLiveWeather(string $city): CurrentWeather
     {
-        $cacheKey = sprintf('weather:%s:%s:live', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:live', $this->getName(), $this->lang, md5($city));
 
         $cached = $this->getFromCache($cacheKey);
         if ($cached !== null) {
@@ -76,7 +91,7 @@ class Weather
 
     public function getForecastsWeather(string $city): Forecast
     {
-        $cacheKey = sprintf('weather:%s:%s:forecast', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:forecast', $this->getName(), $this->lang, md5($city));
 
         $cached = $this->getFromCache($cacheKey);
         if ($cached !== null) {
@@ -94,7 +109,7 @@ class Weather
      */
     public function getLifeIndices(string $city): array
     {
-        $cacheKey = sprintf('weather:%s:%s:indices', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:indices', $this->getName(), $this->lang, md5($city));
 
         try {
             $cached = $this->cache?->get($cacheKey);
@@ -118,7 +133,7 @@ class Weather
 
     public function getAirQuality(string $city): ?AirQuality
     {
-        $cacheKey = sprintf('weather:%s:%s:aqi', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:aqi', $this->getName(), $this->lang, md5($city));
 
         try {
             $cached = $this->cache?->get($cacheKey);
@@ -147,7 +162,7 @@ class Weather
      */
     public function getAlerts(string $city): array
     {
-        $cacheKey = sprintf('weather:%s:%s:alerts', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:alerts', $this->getName(), $this->lang, md5($city));
 
         try {
             $cached = $this->cache?->get($cacheKey);
@@ -174,7 +189,7 @@ class Weather
      */
     public function getMinutelyPrecipitation(string $city): array
     {
-        $cacheKey = sprintf('weather:%s:%s:minutely', $this->getName(), md5($city));
+        $cacheKey = sprintf('weather:%s:%s:%s:minutely', $this->getName(), $this->lang, md5($city));
 
         try {
             $cached = $this->cache?->get($cacheKey);

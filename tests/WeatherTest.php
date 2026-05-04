@@ -49,6 +49,16 @@ class WeatherTest extends TestCase
         $this->assertSame('qweather', $w->getName());
     }
 
+    public function testSetLang()
+    {
+        $w = new Weather('mock-key');
+        $result = $w->setLang('en');
+
+        $this->assertSame($w, $result);
+        $this->assertSame('en', $w->getLang());
+        $this->assertSame('en', $w->getProvider()->getLang());
+    }
+
     public function testDelegationToProvider()
     {
         $provider = \Mockery::mock(Provider::class);
@@ -68,12 +78,13 @@ class WeatherTest extends TestCase
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
+        $provider->allows()->setLang(\Mockery::any());
         $provider->shouldNotReceive('getLiveWeather');
 
         $cachedWeather = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
+        $cacheKey = 'weather:mock:zh:' . md5('深圳') . ':live';
         $cache->allows()->get($cacheKey)->andReturn($cachedWeather);
 
         $w = new Weather($provider);
@@ -91,7 +102,7 @@ class WeatherTest extends TestCase
         $provider->expects()->getLiveWeather('深圳')->once()->andReturn($weather);
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
+        $cacheKey = 'weather:mock:zh:' . md5('深圳') . ':live';
         $cache->allows()->get($cacheKey)->andReturn(null);
         $cache->expects()->set($cacheKey, $weather, 300)->once();
 

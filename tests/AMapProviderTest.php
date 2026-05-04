@@ -57,6 +57,15 @@ class AMapProviderTest extends TestCase
         $this->assertSame('东', $weather->windDirection);
     }
 
+    public function testSetLang()
+    {
+        $provider = new AMapProvider('mock-key');
+        $this->assertSame('zh', $provider->getLang());
+
+        $provider->setLang('en');
+        $this->assertSame('en', $provider->getLang());
+    }
+
     public function testGetForecastsWeather()
     {
         $client = $this->mockClient([
@@ -99,6 +108,41 @@ class AMapProviderTest extends TestCase
     {
         $provider = new AMapProvider('mock-key');
         $this->assertInstanceOf(ClientInterface::class, $provider->getHttpClient());
+    }
+
+    public function testGetForecastsWeatherInEnglish()
+    {
+        $client = $this->mockClient([
+            'status' => '1',
+            'forecasts' => [
+                [
+                    'city' => 'Shenzhen',
+                    'adcode' => '440300',
+                    'casts' => [
+                        [
+                            'date' => '2024-01-01',
+                            'week' => '1',
+                            'dayweather' => 'Sunny',
+                            'nightweather' => 'Cloudy',
+                            'daytemp' => '28',
+                            'nighttemp' => '18',
+                            'daywind' => 'E',
+                            'nightwind' => 'W',
+                            'daypower' => '≤3',
+                            'nightpower' => '≤3',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $provider = new AMapProvider('mock-key');
+        $provider->setHttpClient($client);
+        $provider->setLang('en');
+
+        $forecast = $provider->getForecastsWeather('Shenzhen');
+
+        $this->assertSame('Mon', $forecast->casts[0]->week);
     }
 
     public function testGetWeatherWithEmptyCity()

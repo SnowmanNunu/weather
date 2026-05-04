@@ -77,4 +77,14 @@ interface Provider
      * Provider name identifier.
      */
     public function getName(): string;
+
+    /**
+     * Set language for API requests.
+     */
+    public function setLang(string $lang): void;
+
+    /**
+     * Get current language.
+     */
+    public function getLang(): string;
 }

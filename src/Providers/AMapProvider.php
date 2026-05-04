@@ -25,9 +25,21 @@ class AMapProvider implements Provider
 
     protected ?Client $httpClient = null;
 
+    protected string $lang = 'zh';
+
     public function __construct(string $key)
     {
         $this->key = $key;
+    }
+
+    public function setLang(string $lang): void
+    {
+        $this->lang = $lang;
+    }
+
+    public function getLang(): string
+    {
+        return $this->lang;
     }
 
     public function getHttpClient(): Client
@@ -245,6 +257,11 @@ class AMapProvider implements Provider
 
     protected function mapWeek(string $week): string
     {
+        if ($this->lang === 'en') {
+            $map = ['1' => 'Mon', '2' => 'Tue', '3' => 'Wed', '4' => 'Thu', '5' => 'Fri', '6' => 'Sat', '7' => 'Sun'];
+            return $map[$week] ?? $week;
+        }
+
         $map = [
             '1' => '周一',
             '2' => '周二',

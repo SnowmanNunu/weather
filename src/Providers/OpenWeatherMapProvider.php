@@ -66,6 +66,16 @@ class OpenWeatherMapProvider implements Provider
         return 'openweathermap';
     }
 
+    public function setLang(string $lang): void
+    {
+        $this->lang = $lang;
+    }
+
+    public function getLang(): string
+    {
+        return $this->lang ?? 'zh';
+    }
+
     public function getLiveWeather(string $city): CurrentWeather
     {
         $data = $this->request('/weather', $city);
