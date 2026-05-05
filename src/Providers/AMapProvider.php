@@ -35,6 +35,7 @@ class AMapProvider implements Provider
     public function __construct(string $key, array $options = [])
     {
         $this->key = $key;
+        $this->lang = $options["lang"] ?? $this->lang;
     }
 
     public function setLang(string $lang): void
