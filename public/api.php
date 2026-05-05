@@ -13,6 +13,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 $providerName = getenv('WEATHER_PROVIDER') ?: 'amap';
 $city = $_GET['city'] ?? '';
+$lang = $_GET['lang'] ?? 'zh';
+putenv('WEATHER_LANG=' . $lang);
 
 $key = match ($providerName) {
     'qweather' => getenv('QWEATHER_KEY') ?: getenv('WEATHER_KEY') ?: '',
@@ -40,22 +42,17 @@ try {
     };
     $weather = new Weather($provider);
 
-    $current = $weather->getLiveWeather($city);
-    $forecast = $weather->getForecastsWeather($city);
-    $indices = $weather->getLifeIndices($city);
-    $aqi = $weather->getAirQuality($city);
-    $alerts = $weather->getAlerts($city);
-    $minutely = $weather->getMinutelyPrecipitation($city);
+    $all = $weather->getAll($city);
 
     echo json_encode([
         'success' => true,
         'provider' => $weather->getName(),
-        'current' => $current->toArray(),
-        'forecast' => $forecast->toArray(),
-        'indices' => array_map(static fn ($i) => $i->toArray(), $indices),
-        'aqi' => $aqi ? $aqi->toArray() : null,
-        'alerts' => array_map(static fn ($a) => $a->toArray(), $alerts),
-        'minutely' => array_map(static fn ($m) => $m->toArray(), $minutely),
+        'current' => $all['current'] ? $all['current']->toArray() : null,
+        'forecast' => $all['forecast'] ? $all['forecast']->toArray() : null,
+        'indices' => array_map(static fn ($i) => $i->toArray(), $all['indices'] ?? []),
+        'aqi' => $all['aqi'] ? $all['aqi']->toArray() : null,
+        'alerts' => array_map(static fn ($a) => $a->toArray(), $all['alerts'] ?? []),
+        'minutely' => array_map(static fn ($m) => $m->toArray(), $all['minutely'] ?? []),
     ], JSON_UNESCAPED_UNICODE);
 } catch (\Throwable $e) {
     http_response_code(500);

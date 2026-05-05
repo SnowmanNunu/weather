@@ -34,7 +34,7 @@ jobs:
         with:
           php-version: '8.2'
       - run: composer install --no-interaction --prefer-dist
-      - run: ./vendor/bin/phpcs src tests --standard=PSR12
+      - run: ./vendor/bin/phpcs src tests --standard=PSR12 --report=full
 
   static-analysis:
     runs-on: ubuntu-latest

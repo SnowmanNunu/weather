@@ -74,7 +74,27 @@ interface Provider
     public function getMinutelyPrecipitation(string $city): array;
 
     /**
+     * Fetch all available data for a city concurrently.
+     *
+     * @param string $city City name or adcode
+     * @return array<string, mixed> Keys: current, forecast, indices, aqi, alerts, minutely
+     * @throws \SnowmanNunu\Weather\Exceptions\HttpException
+     * @throws \SnowmanNunu\Weather\Exceptions\InvalidArgumentException
+     */
+    public function fetchAll(string $city): array;
+
+    /**
      * Provider name identifier.
      */
     public function getName(): string;
+
+    /**
+     * Set language for API requests.
+     */
+    public function setLang(string $lang): void;
+
+    /**
+     * Get current language.
+     */
+    public function getLang(): string;
 }

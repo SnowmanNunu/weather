@@ -1,15 +1,83 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
 
+  const I18N = {
+    zh: {
+      title: '🌤 天气查询',
+      subtitle: '支持高德地图、和风天气等多数据源',
+      placeholder: '输入城市名称，如：北京、上海、深圳',
+      search: '查询',
+      loading: '正在查询天气…',
+      errorNetwork: '网络错误，请稍后重试',
+      errorQuery: '查询失败',
+      humidity: '湿度',
+      windDir: '风向',
+      windPower: '风力',
+      updateTime: '更新时间',
+      minutelyTitle: '分钟级降水预报',
+      forecastTitle: '未来预报',
+      aqiLabel: '空气质量指数',
+      aqiPrimary: '首要污染物：',
+      indicesTitle: '生活指数',
+      poweredBy: 'Powered by',
+    },
+    en: {
+      title: '🌤 Weather',
+      subtitle: 'Multi-provider weather SDK demo',
+      placeholder: 'Enter city name, e.g. Beijing, Shanghai',
+      search: 'Search',
+      loading: 'Loading weather…',
+      errorNetwork: 'Network error, please try again later',
+      errorQuery: 'Query failed',
+      humidity: 'Humidity',
+      windDir: 'Wind',
+      windPower: 'Wind Scale',
+      updateTime: 'Updated',
+      minutelyTitle: 'Minutely Precipitation',
+      forecastTitle: 'Forecast',
+      aqiLabel: 'Air Quality Index',
+      aqiPrimary: 'Primary Pollutant: ',
+      indicesTitle: 'Life Indices',
+      poweredBy: 'Powered by',
+    },
+  };
+
+  let currentLang = localStorage.getItem('weather_lang') || 'zh';
+
+  function t(key) {
+    return I18N[currentLang]?.[key] ?? I18N['zh']?.[key] ?? key;
+  }
+
+  function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('weather_lang', lang);
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    updateStaticUI();
+    const city = els.input.value.trim();
+    if (city) fetchWeather(city);
+  }
+
+  function updateStaticUI() {
+    $('#pageTitle').textContent = t('title');
+    $('#pageSubtitle').textContent = t('subtitle');
+    els.input.placeholder = t('placeholder');
+    els.submitBtn.textContent = t('search');
+    document.querySelectorAll('.lang-switch button').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.lang === currentLang);
+    });
+  }
+
   const els = {
     form: $('#searchForm'),
     input: $('#cityInput'),
+    submitBtn: $('#searchBtn'),
     loading: $('#loading'),
     error: $('#error'),
     result: $('#result'),
   };
 
   function showLoading() {
+    els.loading.textContent = t('loading');
     els.loading.classList.remove('hidden');
     els.error.classList.add('hidden');
     els.result.innerHTML = '';
@@ -50,26 +118,26 @@
       </div>
       <div class="current-meta">
         <div class="meta-item">
-          <span class="meta-label">湿度</span>
+          <span class="meta-label">${t('humidity')}</span>
           <span class="meta-value">${current.humidity != null ? current.humidity + '%' : '-'}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">风向</span>
+          <span class="meta-label">${t('windDir')}</span>
           <span class="meta-value">${escapeHtml(current.wind_direction)}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">风力</span>
+          <span class="meta-label">${t('windPower')}</span>
           <span class="meta-value">${escapeHtml(current.wind_power)}</span>
         </div>
         <div class="meta-item">
-          <span class="meta-label">更新时间</span>
+          <span class="meta-label">${t('updateTime')}</span>
           <span class="meta-value">${escapeHtml(current.update_time)}</span>
         </div>
       </div>
     </div>`;
 
     if (data.minutely && data.minutely.length > 0) {
-      html += '<h2 class="section-title">分钟级降水预报</h2>';
+      html += `<h2 class="section-title">${t('minutelyTitle')}</h2>`;
       html += '<div class="card minutely">';
       html += '<div class="minutely-chart">';
       const maxPrecip = Math.max(...data.minutely.map((m) => m.precipitation), 0.1);
@@ -86,7 +154,7 @@
     }
 
     if (forecast && forecast.casts && forecast.casts.length > 0) {
-      html += '<h2 class="section-title">未来预报</h2>';
+      html += `<h2 class="section-title">${t('forecastTitle')}</h2>`;
       html += '<div class="forecast-grid">';
       forecast.casts.forEach((cast) => {
         html += `<div class="card forecast">
@@ -94,7 +162,7 @@
           <div class="forecast-day">${escapeHtml(cast.week)}</div>
           <div class="forecast-weather">${getWeatherIcon(cast.day_weather)} ${escapeHtml(cast.day_weather)}</div>
           <div class="forecast-temp">${cast.day_temp}° / ${cast.night_temp}°</div>
-          <div class="forecast-wind">${escapeHtml(cast.day_wind)}风 ${escapeHtml(cast.day_power)}</div>
+          <div class="forecast-wind">${escapeHtml(cast.day_wind)} ${escapeHtml(cast.day_power)}</div>
         </div>`;
       });
       html += '</div>';
@@ -108,7 +176,7 @@
           <div class="aqi-value" style="color:${aqiColor}">${aqi.aqi != null ? aqi.aqi : '-'}</div>
           <div class="aqi-meta">
             <div class="aqi-category" style="color:${aqiColor}">${escapeHtml(aqi.category)}</div>
-            <div class="aqi-label">空气质量指数</div>
+            <div class="aqi-label">${t('aqiLabel')}</div>
           </div>
         </div>
         <div class="aqi-details">
@@ -119,12 +187,12 @@
           <div class="aqi-item"><span class="aqi-dt">CO</span><span class="aqi-dv">${aqi.co != null ? aqi.co : '-'}</span></div>
           <div class="aqi-item"><span class="aqi-dt">O₃</span><span class="aqi-dv">${aqi.o3 != null ? aqi.o3 : '-'}</span></div>
         </div>
-        ${aqi.primary_pollutant ? `<div class="aqi-primary">首要污染物：${escapeHtml(aqi.primary_pollutant)}</div>` : ''}
+        ${aqi.primary_pollutant ? `<div class="aqi-primary">${t('aqiPrimary')}${escapeHtml(aqi.primary_pollutant)}</div>` : ''}
       </div>`;
     }
 
     if (data.indices && data.indices.length > 0) {
-      html += '<h2 class="section-title">生活指数</h2>';
+      html += `<h2 class="section-title">${t('indicesTitle')}</h2>`;
       html += '<div class="indices-grid">';
       data.indices.forEach((idx) => {
         html += `<div class="card index">
@@ -157,32 +225,32 @@
 
   function getWeatherIcon(text) {
     if (!text) return '☀️';
-    const t = text.trim();
-    if (t.includes('晴')) return '☀️';
-    if (t.includes('多云')) return '⛅';
-    if (t.includes('阴')) return '☁️';
-    if (t.includes('雷阵雨')) return '⛈️';
-    if (t.includes('暴雨') || t.includes('大暴雨')) return '🌧️';
-    if (t.includes('雨')) return '🌧️';
-    if (t.includes('雪')) return '❄️';
-    if (t.includes('雾') || t.includes('霾')) return '🌫️';
-    if (t.includes('风') || t.includes('沙')) return '💨';
-    if (t.includes('冰雹')) return '🧊';
+    const t = text.trim().toLowerCase();
+    if (t.includes('晴') || t === 'sunny' || t === 'clear' || t.includes('fair')) return '☀️';
+    if (t.includes('多云') || t.includes('cloudy')) return '⛅';
+    if (t.includes('阴') || t.includes('overcast')) return '☁️';
+    if (t.includes('雷阵雨') || t.includes('thunder')) return '⛈️';
+    if (t.includes('暴雨') || t.includes('大暴雨') || t.includes('heavy rain') || t.includes('torrential')) return '🌧️';
+    if (t.includes('雨') || t.includes('rain') || t.includes('drizzle') || t.includes('shower')) return '🌧️';
+    if (t.includes('雪') || t.includes('snow') || t.includes('sleet') || t.includes('blizzard')) return '❄️';
+    if (t.includes('雾') || t.includes('霾') || t.includes('fog') || t.includes('haze') || t.includes('mist')) return '🌫️';
+    if (t.includes('风') || t.includes('沙') || t.includes('wind') || t.includes('sand') || t.includes('dust') || t.includes('blowing')) return '💨';
+    if (t.includes('冰雹') || t.includes('hail')) return '🧊';
     return '☀️';
   }
 
   async function fetchWeather(city) {
     showLoading();
     try {
-      const res = await fetch('/api.php?city=' + encodeURIComponent(city));
+      const res = await fetch('/api.php?city=' + encodeURIComponent(city) + '&lang=' + encodeURIComponent(currentLang));
       const data = await res.json();
       if (!res.ok || data.error) {
-        showError(data.error || '查询失败');
+        showError(data.error || t('errorQuery'));
         return;
       }
       renderWeather(data);
     } catch (e) {
-      showError('网络错误，请稍后重试');
+      showError(t('errorNetwork'));
     }
   }
 
@@ -208,5 +276,12 @@
     fetchWeather(city);
   });
 
+  document.querySelectorAll('.lang-switch button').forEach((btn) => {
+    btn.addEventListener('click', function () {
+      setLang(this.dataset.lang);
+    });
+  });
+
+  updateStaticUI();
   detectLocation();
 })();

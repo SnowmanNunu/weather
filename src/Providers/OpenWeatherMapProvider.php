@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
@@ -15,6 +19,8 @@ use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Exceptions\InvalidKeyException;
+use SnowmanNunu\Weather\Exceptions\RateLimitException;
 
 class OpenWeatherMapProvider implements Provider
 {
@@ -27,17 +33,44 @@ class OpenWeatherMapProvider implements Provider
 
     protected string $baseUri = 'https://api.openweathermap.org/data/2.5';
 
+    protected ?string $lang = null;
+
     public function __construct(string $key)
     {
         $this->key = $key;
+        $this->lang = getenv('WEATHER_LANG') ?: null;
     }
 
     public function getHttpClient(): Client
     {
         if (!$this->httpClient instanceof Client) {
+            $stack = HandlerStack::create();
+            $stack->push(Middleware::retry(
+                function ($retries, $request, $response = null, $exception = null) {
+                    if ($retries >= 2) {
+                        return false;
+                    }
+                    if ($exception instanceof TransferException) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() >= 500) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() === 429) {
+                        return true;
+                    }
+
+                    return false;
+                },
+                function ($retries) {
+                    return 100 * (2 ** $retries);
+                }
+            ));
+
             $this->httpClient = new Client(array_merge([
                 'timeout' => 10,
                 'connect_timeout' => 5,
+                'handler' => $stack,
             ], $this->guzzleOptions));
         }
 
@@ -61,6 +94,16 @@ class OpenWeatherMapProvider implements Provider
     public function getName(): string
     {
         return 'openweathermap';
+    }
+
+    public function setLang(string $lang): void
+    {
+        $this->lang = $lang;
+    }
+
+    public function getLang(): string
+    {
+        return $this->lang ?? 'zh';
     }
 
     public function getLiveWeather(string $city): CurrentWeather
@@ -97,6 +140,56 @@ class OpenWeatherMapProvider implements Provider
         return [];
     }
 
+    public function fetchAll(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $url = $this->baseUri;
+        $lang = $this->lang === 'zh' ? 'zh_cn' : ($this->lang ?: 'zh_cn');
+        $query = [
+            'q' => $city,
+            'appid' => $this->key,
+            'units' => 'metric',
+            'lang' => $lang,
+        ];
+        $client = $this->getHttpClient();
+
+        $promises = [
+            'current' => $client->getAsync($url . '/weather', ['query' => $query])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            return $this->normalizeCurrent(is_array($data) ? $data : []);
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'forecast' => $client->getAsync($url . '/forecast', ['query' => $query])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            return $this->normalizeForecast(is_array($data) ? $data : []);
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'indices' => \GuzzleHttp\Promise\Create::promiseFor([]),
+            'aqi' => \GuzzleHttp\Promise\Create::promiseFor(null),
+            'alerts' => \GuzzleHttp\Promise\Create::promiseFor([]),
+            'minutely' => \GuzzleHttp\Promise\Create::promiseFor([]),
+        ];
+
+        return Utils::unwrap($promises);
+    }
+
     /**
      * @return array<string, mixed>
      * @throws HttpException
@@ -111,19 +204,30 @@ class OpenWeatherMapProvider implements Provider
         $url = $this->baseUri . $endpoint;
 
         try {
+            $lang = $this->lang === 'zh' ? 'zh_cn' : ($this->lang ?: 'zh_cn');
             $response = $this->getHttpClient()->get($url, [
                 'query' => [
                     'q' => $city,
                     'appid' => $this->key,
                     'units' => 'metric',
-                    'lang' => 'zh_cn',
+                    'lang' => $lang,
                 ],
-            ])->getBody()->getContents();
+            ]);
 
-            $decoded = json_decode($response, true);
+            $decoded = json_decode($response->getBody()->getContents(), true);
 
             return is_array($decoded) ? $decoded : [];
         } catch (TransferException $e) {
+            if ($e instanceof ClientException && $e->getResponse()) {
+                $status = $e->getResponse()->getStatusCode();
+                $message = 'OpenWeatherMap API error: HTTP ' . $status;
+                if ($status === 401) {
+                    throw new InvalidKeyException($message, $status, $e);
+                }
+                if ($status === 429) {
+                    throw new RateLimitException($message, $status, $e);
+                }
+            }
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
     }
@@ -225,8 +329,15 @@ class OpenWeatherMapProvider implements Provider
 
     protected function dateToWeek(string $date): string
     {
-        $week = date('N', strtotime($date));
-        $map = ['1' => '周一', '2' => '周二', '3' => '周三', '4' => '周四', '5' => '周五', '6' => '周六', '7' => '周日'];
+        $timestamp = strtotime($date);
+        if ($timestamp === false) {
+            return '';
+        }
+        $week = date('N', $timestamp);
+        $map = [
+            '1' => '周一', '2' => '周二', '3' => '周三',
+            '4' => '周四', '5' => '周五', '6' => '周六', '7' => '周日',
+        ];
 
         return $map[$week];
     }

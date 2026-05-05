@@ -49,6 +49,16 @@ class WeatherTest extends TestCase
         $this->assertSame('qweather', $w->getName());
     }
 
+    public function testSetLang()
+    {
+        $w = new Weather('mock-key');
+        $result = $w->setLang('en');
+
+        $this->assertSame($w, $result);
+        $this->assertSame('en', $w->getLang());
+        $this->assertSame('en', $w->getProvider()->getLang());
+    }
+
     public function testDelegationToProvider()
     {
         $provider = \Mockery::mock(Provider::class);
@@ -68,12 +78,13 @@ class WeatherTest extends TestCase
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
+        $provider->allows()->setLang(\Mockery::any());
         $provider->shouldNotReceive('getLiveWeather');
 
         $cachedWeather = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
+        $cacheKey = 'weather:mock:zh:' . md5('深圳') . ':live';
         $cache->allows()->get($cacheKey)->andReturn($cachedWeather);
 
         $w = new Weather($provider);
@@ -91,7 +102,7 @@ class WeatherTest extends TestCase
         $provider->expects()->getLiveWeather('深圳')->once()->andReturn($weather);
 
         $cache = \Mockery::mock(\Psr\SimpleCache\CacheInterface::class);
-        $cacheKey = 'weather:mock:' . md5('深圳') . ':live';
+        $cacheKey = 'weather:mock:zh:' . md5('深圳') . ':live';
         $cache->allows()->get($cacheKey)->andReturn(null);
         $cache->expects()->set($cacheKey, $weather, 300)->once();
 
@@ -177,7 +188,13 @@ class WeatherTest extends TestCase
     {
         $provider = \Mockery::mock(Provider::class);
         $provider->allows()->getName()->andReturn('mock');
-        $alert = new \SnowmanNunu\Weather\DTO\WeatherAlert('暴雨预警', '暴雨', '黄色', '预计未来有强降水', '2024-01-01 10:00');
+        $alert = new \SnowmanNunu\Weather\DTO\WeatherAlert(
+            '暴雨预警',
+            '暴雨',
+            '黄色',
+            '预计未来有强降水',
+            '2024-01-01 10:00',
+        );
         $provider->expects()->getAlerts('北京')->andReturn([$alert]);
 
         $w = new Weather($provider);
@@ -208,5 +225,29 @@ class WeatherTest extends TestCase
 
         $this->expectException(\BadMethodCallException::class);
         $w->getHttpClient();
+    }
+
+    public function testGetAllDelegatesToProvider()
+    {
+        $provider = \Mockery::mock(Provider::class);
+        $provider->allows()->getName()->andReturn('mock');
+        $provider->allows()->setLang(\Mockery::any());
+
+        $current = new CurrentWeather('深圳市', '440300', 26.0, '晴', '东', '≤3');
+        $forecast = new Forecast('深圳市', '440300', []);
+        $provider->expects()->fetchAll('深圳')->once()->andReturn([
+            'current' => $current,
+            'forecast' => $forecast,
+            'indices' => [],
+            'aqi' => null,
+            'alerts' => [],
+            'minutely' => [],
+        ]);
+
+        $w = new Weather($provider);
+        $result = $w->getAll('深圳');
+
+        $this->assertSame($current, $result['current']);
+        $this->assertSame($forecast, $result['forecast']);
     }
 }

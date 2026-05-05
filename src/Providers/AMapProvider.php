@@ -6,6 +6,9 @@ namespace SnowmanNunu\Weather\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\TransferException;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Promise\Utils;
 use SnowmanNunu\Weather\Contracts\Provider;
 use SnowmanNunu\Weather\DTO\AirQuality;
 use SnowmanNunu\Weather\DTO\CurrentWeather;
@@ -15,6 +18,8 @@ use SnowmanNunu\Weather\DTO\LifeIndex;
 use SnowmanNunu\Weather\DTO\WeatherAlert;
 use SnowmanNunu\Weather\Exceptions\HttpException;
 use SnowmanNunu\Weather\Exceptions\InvalidArgumentException;
+use SnowmanNunu\Weather\Exceptions\InvalidKeyException;
+use SnowmanNunu\Weather\Exceptions\RateLimitException;
 
 class AMapProvider implements Provider
 {
@@ -25,15 +30,52 @@ class AMapProvider implements Provider
 
     protected ?Client $httpClient = null;
 
+    protected string $lang = 'zh';
+
     public function __construct(string $key)
     {
         $this->key = $key;
     }
 
+    public function setLang(string $lang): void
+    {
+        $this->lang = $lang;
+    }
+
+    public function getLang(): string
+    {
+        return $this->lang;
+    }
+
     public function getHttpClient(): Client
     {
         if (!$this->httpClient instanceof Client) {
-            $this->httpClient = new Client($this->guzzleOptions);
+            $stack = HandlerStack::create();
+            $stack->push(Middleware::retry(
+                function ($retries, $request, $response = null, $exception = null) {
+                    if ($retries >= 2) {
+                        return false;
+                    }
+                    if ($exception instanceof TransferException) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() >= 500) {
+                        return true;
+                    }
+                    if ($response && $response->getStatusCode() === 429) {
+                        return true;
+                    }
+
+                    return false;
+                },
+                function ($retries) {
+                    return 100 * (2 ** $retries);
+                }
+            ));
+
+            $this->httpClient = new Client(array_merge([
+                'handler' => $stack,
+            ], $this->guzzleOptions));
         }
 
         return $this->httpClient;
@@ -144,11 +186,39 @@ class AMapProvider implements Provider
             ])->getBody()->getContents();
 
             $decoded = json_decode($response, true);
+            $data = is_array($decoded) ? $decoded : [];
+            $this->throwOnErrorInfo($data);
 
-            return is_array($decoded) ? $decoded : [];
+            return $data;
         } catch (TransferException $e) {
             throw new HttpException($e->getMessage(), (int) $e->getCode(), $e);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @throws InvalidKeyException
+     * @throws RateLimitException
+     * @throws HttpException
+     */
+    protected function throwOnErrorInfo(array $data): void
+    {
+        if (($data['status'] ?? '0') === '1') {
+            return;
+        }
+
+        $info = $data['info'] ?? 'UNKNOWN_ERROR';
+        $message = 'AMap API error: ' . $info;
+
+        if (in_array($info, ['INVALID_USER_KEY', 'INVALID_USER_SCODE', 'USERKEY_PLAT_NOMATCH'], true)) {
+            throw new InvalidKeyException($message);
+        }
+
+        if ($info === 'OVER_LIMIT') {
+            throw new RateLimitException($message);
+        }
+
+        throw new HttpException($message);
     }
 
     public function getLifeIndices(string $city): array
@@ -243,8 +313,154 @@ class AMapProvider implements Provider
         return [];
     }
 
+    public function fetchAll(string $city): array
+    {
+        if (empty($city)) {
+            throw new InvalidArgumentException('City name cannot be empty.');
+        }
+
+        $client = $this->getHttpClient();
+        $baseQuery = ['key' => $this->key, 'city' => $city];
+
+        $promises = [
+            'current' => $client->getAsync(
+                'https://restapi.amap.com/v3/weather/weatherInfo',
+                ['query' => array_merge($baseQuery, ['extensions' => 'base'])]
+            )
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (($data['status'] ?? '0') !== '1' || empty($data['lives'][0])) {
+                                return null;
+                            }
+                            $live = $data['lives'][0];
+
+                            return new CurrentWeather(
+                                city: $live['city'] ?? $city,
+                                adcode: $live['adcode'] ?? '',
+                                temperature: (float) ($live['temperature'] ?? 0),
+                                weather: $live['weather'] ?? '',
+                                windDirection: $live['winddirection'] ?? '',
+                                windPower: $live['windpower'] ?? '',
+                                humidity: isset($live['humidity']) ? (int) $live['humidity'] : null,
+                                updateTime: $live['reporttime'] ?? '',
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'forecast' => $client->getAsync(
+                'https://restapi.amap.com/v3/weather/weatherInfo',
+                ['query' => array_merge($baseQuery, ['extensions' => 'all'])]
+            )
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (($data['status'] ?? '0') !== '1' || empty($data['forecasts'][0])) {
+                                return null;
+                            }
+                            $forecast = $data['forecasts'][0];
+                            $casts = [];
+                            foreach ($forecast['casts'] ?? [] as $cast) {
+                                $casts[] = new ForecastDay(
+                                    date: $cast['date'] ?? '',
+                                    week: $this->mapWeek($cast['week'] ?? ''),
+                                    dayWeather: $cast['dayweather'] ?? '',
+                                    nightWeather: $cast['nightweather'] ?? '',
+                                    dayTemp: (float) ($cast['daytemp'] ?? 0),
+                                    nightTemp: (float) ($cast['nighttemp'] ?? 0),
+                                    dayWind: $cast['daywind'] ?? '',
+                                    nightWind: $cast['nightwind'] ?? '',
+                                    dayPower: $cast['daypower'] ?? '',
+                                    nightPower: $cast['nightpower'] ?? '',
+                                );
+                            }
+
+                            return new Forecast(
+                                city: $forecast['city'] ?? $city,
+                                adcode: $forecast['adcode'] ?? '',
+                                casts: $casts,
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'indices' => $client->getAsync('https://restapi.amap.com/v3/weather/lifestyle', ['query' => $baseQuery])
+                ->then(
+                    function ($response) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['status'] ?? '0') !== '1') {
+                                return [];
+                            }
+                            $indices = [];
+                            foreach ($data['lifestyles'] ?? [] as $item) {
+                                $indices[] = new LifeIndex(
+                                    name: $item['name'] ?? '',
+                                    level: $item['level'] ?? '',
+                                    category: $item['category'] ?? '',
+                                    advice: $item['text'] ?? '',
+                                    type: $item['type'] ?? '',
+                                );
+                            }
+
+                            return $indices;
+                        } catch (\Throwable $e) {
+                            return [];
+                        }
+                    },
+                    fn () => [],
+                ),
+            'aqi' => $client->getAsync('https://restapi.amap.com/v3/air/quality', ['query' => $baseQuery])
+                ->then(
+                    function ($response) use ($city) {
+                        try {
+                            $data = json_decode($response->getBody()->getContents(), true);
+                            if (!is_array($data) || ($data['status'] ?? '0') !== '1') {
+                                return null;
+                            }
+                            $aqi = $data['aqi'] ?? [];
+
+                            return new AirQuality(
+                                city: $data['city']['name'] ?? $city,
+                                aqi: isset($aqi['aqi']) ? (int) $aqi['aqi'] : null,
+                                level: $aqi['level'] ?? null,
+                                category: $aqi['category'] ?? null,
+                                primaryPollutant: $aqi['primary'] ?? null,
+                                pm25: isset($aqi['pm25']) ? (float) $aqi['pm25'] : null,
+                                pm10: isset($aqi['pm10']) ? (float) $aqi['pm10'] : null,
+                                no2: isset($aqi['no2']) ? (float) $aqi['no2'] : null,
+                                so2: isset($aqi['so2']) ? (float) $aqi['so2'] : null,
+                                co: isset($aqi['co']) ? (float) $aqi['co'] : null,
+                                o3: isset($aqi['o3']) ? (float) $aqi['o3'] : null,
+                                updateTime: $aqi['pub_time'] ?? null,
+                            );
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    },
+                    fn () => null,
+                ),
+            'alerts' => \GuzzleHttp\Promise\Create::promiseFor([]),
+            'minutely' => \GuzzleHttp\Promise\Create::promiseFor([]),
+        ];
+
+        return Utils::unwrap($promises);
+    }
+
     protected function mapWeek(string $week): string
     {
+        if ($this->lang === 'en') {
+            $map = ['1' => 'Mon', '2' => 'Tue', '3' => 'Wed', '4' => 'Thu', '5' => 'Fri', '6' => 'Sat', '7' => 'Sun'];
+            return $map[$week] ?? $week;
+        }
+
         $map = [
             '1' => '周一',
             '2' => '周二',

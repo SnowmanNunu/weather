@@ -9,8 +9,12 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌤 天气查询</h1>
-            <p class="subtitle">支持高德地图、和风天气等多数据源</p>
+            <div class="lang-switch">
+                <button type="button" data-lang="zh" class="active">中文</button>
+                <button type="button" data-lang="en">English</button>
+            </div>
+            <h1 id="pageTitle">🌤 天气查询</h1>
+            <p class="subtitle" id="pageSubtitle">支持高德地图、和风天气等多数据源</p>
         </header>
 
         <form class="search-box" id="searchForm">
@@ -21,7 +25,7 @@
                 placeholder="输入城市名称，如：北京、上海、深圳"
                 required
             >
-            <button type="submit">查询</button>
+            <button type="submit" id="searchBtn">查询</button>
         </form>
 
         <div id="loading" class="loading hidden">正在查询天气…</div>
