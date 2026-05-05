@@ -72,14 +72,16 @@ $current = $weather->getLiveWeather('London');
 
 
 > ⚠️ **注意**：和风天气的标准版 / 商业版 key 通常绑定**私有 API 主机**（如 `xxx.re.qweatherapi.com`），
-> 而不是默认的 `devapi.qweather.com`。如果遇到 `403 Invalid Host`，请通过环境变量指定正确的主机：
+> 而不是默认的 `devapi.qweather.com`。如果遇到 `403 Invalid Host`，可在构造时传入 `host` 参数：
 >
 > ```php
-> putenv('QWEATHER_API_HOST=https://xxx.re.qweatherapi.com');
-> $weather = new Weather(new QWeatherProvider('your-qweather-key'));
+> $weather = new Weather(new QWeatherProvider('your-qweather-key', [
+>     'host' => 'https://xxx.re.qweatherapi.com',
+> ]));
 > ```
 >
-> 或在 Nginx / PHP-FPM 中配置：
+> `host` 参数同时支持 `http://` 或裸域名（会自动补全 `https://`）。
+> 也可以在 Nginx / PHP-FPM 中通过环境变量全局配置：
 > ```nginx
 > fastcgi_param QWEATHER_KEY your-key;
 > fastcgi_param QWEATHER_API_HOST https://xxx.re.qweatherapi.com;

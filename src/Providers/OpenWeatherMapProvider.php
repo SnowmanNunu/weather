@@ -35,10 +35,17 @@ class OpenWeatherMapProvider implements Provider
 
     protected ?string $lang = null;
 
-    public function __construct(string $key)
+    public function __construct(string $key, array $options = [])
     {
         $this->key = $key;
-        $this->lang = getenv('WEATHER_LANG') ?: null;
+        $this->lang = $options['lang'] ?? getenv('WEATHER_LANG') ?: null;
+        if (isset($options['host'])) {
+            $host = $options['host'];
+            if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
+                $host = 'https://' . $host;
+            }
+            $this->baseUri = rtrim($host, '/') . '/data/2.5';
+        }
     }
 
     public function getHttpClient(): Client

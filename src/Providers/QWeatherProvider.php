@@ -38,11 +38,11 @@ class QWeatherProvider implements Provider
     /** @var array<string, string> */
     protected array $locationCache = [];
 
-    public function __construct(string $key)
+    public function __construct(string $key, array $options = [])
     {
         $this->key = $key;
-        $this->lang = getenv('WEATHER_LANG') ?: null;
-        $host = getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
+        $this->lang = $options['lang'] ?? getenv('WEATHER_LANG') ?: null;
+        $host = $options['host'] ?? getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
         if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
             $host = 'https://' . $host;
         }
@@ -617,10 +617,7 @@ class QWeatherProvider implements Provider
         }
 
         try {
-            $host = getenv('QWEATHER_API_HOST') ?: 'https://devapi.qweather.com';
-            if (!str_starts_with($host, 'http://') && !str_starts_with($host, 'https://')) {
-                $host = 'https://' . $host;
-            }
+            $host = str_replace('/v7', '', $this->baseUri);
             $url = rtrim($host, '/') . '/geo/v2/city/lookup';
 
             $response = $this->getHttpClient()->get($url, [

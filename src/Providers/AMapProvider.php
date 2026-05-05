@@ -32,7 +32,7 @@ class AMapProvider implements Provider
 
     protected string $lang = 'zh';
 
-    public function __construct(string $key)
+    public function __construct(string $key, array $options = [])
     {
         $this->key = $key;
     }
