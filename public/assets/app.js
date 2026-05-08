@@ -1,10 +1,12 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
 
   const I18N = {
     zh: {
-      title: '🌤 天气查询',
-      subtitle: '支持高德地图、和风天气等多数据源',
+      title: '实时天气查询',
+      subtitle: '聚合高德、和风天气等多数据源，精准预报',
+      logo: 'Weather',
       placeholder: '输入城市名称，如：北京、上海、深圳',
       search: '查询',
       loading: '正在查询天气…',
@@ -22,8 +24,9 @@
       poweredBy: 'Powered by',
     },
     en: {
-      title: '🌤 Weather',
+      title: 'Live Weather',
       subtitle: 'Multi-provider weather SDK demo',
+      logo: 'Weather',
       placeholder: 'Enter city name, e.g. Beijing, Shanghai',
       search: 'Search',
       loading: 'Loading weather…',
@@ -60,30 +63,42 @@
   function updateStaticUI() {
     $('#pageTitle').textContent = t('title');
     $('#pageSubtitle').textContent = t('subtitle');
+    $('#logoText').textContent = t('logo');
     els.input.placeholder = t('placeholder');
-    els.submitBtn.textContent = t('search');
-    document.querySelectorAll('.lang-switch button').forEach((btn) => {
+    els.btnText.textContent = t('search');
+    $$('.lang-switch button').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.lang === currentLang);
+    });
+    $$('.footer a').forEach((a) => {
+      const p = a.closest('p');
+      if (p) p.firstChild.textContent = t('poweredBy') + ' ';
     });
   }
 
   const els = {
     form: $('#searchForm'),
     input: $('#cityInput'),
-    submitBtn: $('#searchBtn'),
+    btnText: $('.btn-text'),
+    btnLoader: $('.btn-loader'),
     loading: $('#loading'),
+    loadingText: $('#loadingText'),
     error: $('#error'),
     result: $('#result'),
+    bgLayer: $('#bgLayer'),
   };
 
   function showLoading() {
-    els.loading.textContent = t('loading');
+    els.btnText.classList.add('hidden');
+    els.btnLoader.classList.remove('hidden');
+    els.loadingText.textContent = t('loading');
     els.loading.classList.remove('hidden');
     els.error.classList.add('hidden');
     els.result.innerHTML = '';
   }
 
   function hideLoading() {
+    els.btnText.classList.remove('hidden');
+    els.btnLoader.classList.add('hidden');
     els.loading.classList.add('hidden');
   }
 
@@ -93,52 +108,79 @@
     els.error.classList.remove('hidden');
   }
 
+  function setBgByWeather(text) {
+    if (!text) return;
+    const w = text.trim().toLowerCase();
+    const layer = els.bgLayer;
+    layer.classList.remove('rain', 'snow', 'sunny');
+    if (w.includes('雨') || w.includes('rain') || w.includes('thunder') || w.includes('shower')) {
+      layer.classList.add('rain');
+    } else if (w.includes('雪') || w.includes('snow') || w.includes('sleet')) {
+      layer.classList.add('snow');
+    } else if (w.includes('晴') || w === 'sunny' || w === 'clear' || w.includes('fair')) {
+      layer.classList.add('sunny');
+    }
+  }
+
+  function staggerClass(index) {
+    const n = Math.min(index + 1, 7);
+    return 'stagger-' + n;
+  }
+
   function renderWeather(data) {
     hideLoading();
     const current = data.current;
     const forecast = data.forecast;
 
     let html = '';
+    let cardIndex = 0;
 
     if (data.alerts && data.alerts.length > 0) {
       data.alerts.forEach((alert) => {
-        html += `<div class="alert alert-danger">
+        html += `<div class="alert alert-danger ${staggerClass(cardIndex++)}">
           <strong>${escapeHtml(alert.title)}</strong>
           <p>${escapeHtml(alert.content)}</p>
-          <small>${escapeHtml(alert.pub_time)} · ${escapeHtml(alert.sender)}</small>
+          <small>${formatBeijingTime(alert.pub_time)} · ${escapeHtml(alert.sender)}</small>
         </div>`;
       });
     }
 
-    html += `<div class="card current">
-      <div class="current-main">
-        <div class="city-name">${escapeHtml(current.city)}</div>
-        <div class="temperature">${current.temperature}°</div>
-        <div class="weather-desc">${escapeHtml(current.weather)}</div>
-      </div>
-      <div class="current-meta">
-        <div class="meta-item">
-          <span class="meta-label">${t('humidity')}</span>
-          <span class="meta-value">${current.humidity != null ? current.humidity + '%' : '-'}</span>
+    if (current) {
+      setBgByWeather(current.weather);
+      const bigIcon = getWeatherIcon(current.weather);
+      html += `<div class="card current ${staggerClass(cardIndex++)}">
+        <div class="current-main">
+          <div class="city-name">
+            <span class="weather-icon-big">${bigIcon}</span>
+            ${escapeHtml(current.city)}
+          </div>
+          <div class="temperature">${current.temperature != null ? current.temperature : '-'}°</div>
+          <div class="weather-desc">${escapeHtml(current.weather)}</div>
         </div>
-        <div class="meta-item">
-          <span class="meta-label">${t('windDir')}</span>
-          <span class="meta-value">${escapeHtml(current.wind_direction)}</span>
+        <div class="current-meta">
+          <div class="meta-item">
+            <span class="meta-label">${t('humidity')}</span>
+            <span class="meta-value">${current.humidity != null ? current.humidity + '%' : '-'}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">${t('windDir')}</span>
+            <span class="meta-value">${escapeHtml(current.wind_direction)}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">${t('windPower')}</span>
+            <span class="meta-value">${escapeHtml(current.wind_power)}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">${t('updateTime')}</span>
+            <span class="meta-value">${formatBeijingTime(current.update_time)}</span>
+          </div>
         </div>
-        <div class="meta-item">
-          <span class="meta-label">${t('windPower')}</span>
-          <span class="meta-value">${escapeHtml(current.wind_power)}</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">${t('updateTime')}</span>
-          <span class="meta-value">${escapeHtml(current.update_time)}</span>
-        </div>
-      </div>
-    </div>`;
+      </div>`;
+    }
 
     if (data.minutely && data.minutely.length > 0) {
-      html += `<h2 class="section-title">${t('minutelyTitle')}</h2>`;
-      html += '<div class="card minutely">';
+      html += `<h2 class="section-title ${staggerClass(cardIndex)}">${t('minutelyTitle')}</h2>`;
+      html += `<div class="card minutely ${staggerClass(cardIndex++)}">`;
       html += '<div class="minutely-chart">';
       const maxPrecip = Math.max(...data.minutely.map((m) => m.precipitation), 0.1);
       data.minutely.forEach((m, i) => {
@@ -154,24 +196,26 @@
     }
 
     if (forecast && forecast.casts && forecast.casts.length > 0) {
-      html += `<h2 class="section-title">${t('forecastTitle')}</h2>`;
-      html += '<div class="forecast-grid">';
-      forecast.casts.forEach((cast) => {
-        html += `<div class="card forecast">
+      html += `<h2 class="section-title ${staggerClass(cardIndex)}">${t('forecastTitle')}</h2>`;
+      html += `<div class="forecast-grid">`;
+      forecast.casts.forEach((cast, i) => {
+        html += `<div class="card forecast ${staggerClass(cardIndex + i)}">
           <div class="forecast-date">${escapeHtml(cast.date)}</div>
           <div class="forecast-day">${escapeHtml(cast.week)}</div>
-          <div class="forecast-weather">${getWeatherIcon(cast.day_weather)} ${escapeHtml(cast.day_weather)}</div>
+          <div class="forecast-weather">${getWeatherIcon(cast.day_weather)}</div>
           <div class="forecast-temp">${cast.day_temp}° / ${cast.night_temp}°</div>
           <div class="forecast-wind">${escapeHtml(cast.day_wind)} ${escapeHtml(cast.day_power)}</div>
         </div>`;
       });
       html += '</div>';
+      cardIndex += forecast.casts.length;
     }
 
     if (data.aqi) {
       const aqi = data.aqi;
       const aqiColor = getAqiColor(aqi.aqi);
-      html += `<div class="card aqi">
+      const aqiPct = Math.min((aqi.aqi || 0) / 300 * 100, 100);
+      html += `<div class="card aqi ${staggerClass(cardIndex++)}">
         <div class="aqi-header">
           <div class="aqi-value" style="color:${aqiColor}">${aqi.aqi != null ? aqi.aqi : '-'}</div>
           <div class="aqi-meta">
@@ -179,6 +223,7 @@
             <div class="aqi-label">${t('aqiLabel')}</div>
           </div>
         </div>
+        <div class="aqi-bar"><div class="aqi-bar-fill" style="width:${aqiPct}%;background:${aqiColor}"></div></div>
         <div class="aqi-details">
           <div class="aqi-item"><span class="aqi-dt">PM2.5</span><span class="aqi-dv">${aqi.pm25 != null ? aqi.pm25 : '-'}</span></div>
           <div class="aqi-item"><span class="aqi-dt">PM10</span><span class="aqi-dv">${aqi.pm10 != null ? aqi.pm10 : '-'}</span></div>
@@ -192,10 +237,10 @@
     }
 
     if (data.indices && data.indices.length > 0) {
-      html += `<h2 class="section-title">${t('indicesTitle')}</h2>`;
-      html += '<div class="indices-grid">';
-      data.indices.forEach((idx) => {
-        html += `<div class="card index">
+      html += `<h2 class="section-title ${staggerClass(cardIndex)}">${t('indicesTitle')}</h2>`;
+      html += `<div class="indices-grid">`;
+      data.indices.forEach((idx, i) => {
+        html += `<div class="card index ${staggerClass(cardIndex + i)}">
           <div class="index-name">${escapeHtml(idx.name)}</div>
           <div class="index-level">${escapeHtml(idx.category)}</div>
           <div class="index-advice">${escapeHtml(idx.advice)}</div>
@@ -213,6 +258,14 @@
     return div.innerHTML;
   }
 
+  function formatBeijingTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return escapeHtml(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function getAqiColor(aqi) {
     if (aqi == null) return '#9ca3af';
     if (aqi <= 50) return '#22c55e';
@@ -225,17 +278,17 @@
 
   function getWeatherIcon(text) {
     if (!text) return '☀️';
-    const t = text.trim().toLowerCase();
-    if (t.includes('晴') || t === 'sunny' || t === 'clear' || t.includes('fair')) return '☀️';
-    if (t.includes('多云') || t.includes('cloudy')) return '⛅';
-    if (t.includes('阴') || t.includes('overcast')) return '☁️';
-    if (t.includes('雷阵雨') || t.includes('thunder')) return '⛈️';
-    if (t.includes('暴雨') || t.includes('大暴雨') || t.includes('heavy rain') || t.includes('torrential')) return '🌧️';
-    if (t.includes('雨') || t.includes('rain') || t.includes('drizzle') || t.includes('shower')) return '🌧️';
-    if (t.includes('雪') || t.includes('snow') || t.includes('sleet') || t.includes('blizzard')) return '❄️';
-    if (t.includes('雾') || t.includes('霾') || t.includes('fog') || t.includes('haze') || t.includes('mist')) return '🌫️';
-    if (t.includes('风') || t.includes('沙') || t.includes('wind') || t.includes('sand') || t.includes('dust') || t.includes('blowing')) return '💨';
-    if (t.includes('冰雹') || t.includes('hail')) return '🧊';
+    const w = text.trim().toLowerCase();
+    if (w.includes('晴') || w === 'sunny' || w === 'clear' || w.includes('fair')) return '☀️';
+    if (w.includes('多云') || w.includes('cloudy')) return '⛅';
+    if (w.includes('阴') || w.includes('overcast')) return '☁️';
+    if (w.includes('雷阵雨') || w.includes('thunder')) return '⛈️';
+    if (w.includes('暴雨') || w.includes('大暴雨') || w.includes('heavy rain') || w.includes('torrential')) return '🌧️';
+    if (w.includes('雨') || w.includes('rain') || w.includes('drizzle') || w.includes('shower')) return '🌧️';
+    if (w.includes('雪') || w.includes('snow') || w.includes('sleet') || w.includes('blizzard')) return '❄️';
+    if (w.includes('雾') || w.includes('霾') || w.includes('fog') || w.includes('haze') || w.includes('mist')) return '🌫️';
+    if (w.includes('风') || w.includes('沙') || w.includes('wind') || w.includes('sand') || w.includes('dust') || w.includes('blowing')) return '💨';
+    if (w.includes('冰雹') || w.includes('hail')) return '🧊';
     return '☀️';
   }
 
@@ -276,9 +329,16 @@
     fetchWeather(city);
   });
 
-  document.querySelectorAll('.lang-switch button').forEach((btn) => {
+  $$('.lang-switch button').forEach((btn) => {
     btn.addEventListener('click', function () {
       setLang(this.dataset.lang);
+    });
+  });
+
+  $$('#quickChips button').forEach((btn) => {
+    btn.addEventListener('click', function () {
+      els.input.value = this.dataset.city;
+      fetchWeather(this.dataset.city);
     });
   });
 
